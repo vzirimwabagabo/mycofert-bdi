@@ -1,0 +1,360 @@
+import type { Dict } from './fr';
+
+// English dictionary — mirrors the French structure exactly (type-checked).
+export const en: Dict = {
+  langName: 'English',
+  meta: {
+    title: 'MYCOFERT Burundi — Fresh & processed mushrooms + bio-organic fertilizer',
+    description:
+      'Mushroom producer and processor, supplier of cultivation substrate and bio-organic fertilizers, and mushroom farming training provider in Bujumbura, Burundi.',
+  },
+  brand: {
+    tagline: 'Mushrooms today, sustainable agriculture tomorrow!',
+    motto: 'Cultivating mushrooms, harvesting prosperity.',
+  },
+  nav: {
+    home: 'Home',
+    products: 'Products',
+    about: 'About Us',
+    sustainability: 'Sustainability',
+    training: 'Training',
+    news: 'News',
+    contact: 'Contact',
+    admin: 'Admin',
+  },
+  common: {
+    learnMore: 'Learn more',
+    whatsapp: 'WhatsApp',
+    call: 'Call',
+    email: 'Email',
+    location: 'Location',
+    orderWhatsapp: 'Order via WhatsApp',
+    requestQuote: 'Request a quote',
+    contactUs: 'Contact us',
+    seeProducts: 'Explore our products',
+    becomeGrower: 'Become a grower',
+    requestTraining: 'Request training',
+    sendMessage: 'Send a message',
+    langLabel: 'Language',
+    ourProducts: 'Our products',
+    phoneLabel: 'Phone',
+    addressLabel: 'Address',
+    hoursLabel: 'Hours',
+    hoursValue: 'Monday – Saturday: 8:00 AM – 5:00 PM',
+  },
+  home: {
+    heroBadge: 'Production · Processing · Training',
+    heroTitle: 'Fresh and processed mushrooms, plus bio-organic fertilizer',
+    heroSubtitle:
+      'One company, many solutions for your health and your agriculture. Local, 100% natural products grown in Bujumbura.',
+    heroStat1: 'product lines',
+    heroStat2: 'customer channels',
+    heroStat3: 'circular approach',
+    categoriesTitle: 'Our product lines',
+    categoriesSubtitle:
+      'From fresh mushrooms to agricultural inputs, one integrated chain serving your table and your fields.',
+    segmentsTitle: 'Who our products serve',
+    segmentsSubtitle: 'Individuals and professionals — we have an offer adapted to every need.',
+    sustainabilityTitle: 'From spent substrate to fertile soil',
+    sustainabilityText:
+      'We convert the substrate left after harvest into solid and liquid bio-organic fertilizer. A circular, zero-waste approach that enriches soils and increases yields.',
+    sustainabilityCta: 'Discover our approach',
+    valuesTitle: 'Our commitments',
+    trainingTeaserTitle: 'Mushroom cultivation training',
+    trainingTeaserText:
+      'We train young people, women and farmers in mushroom cultivation: from substrate preparation to harvest and marketing.',
+    newsTitle: 'News and resources',
+    newsSubtitle: 'Company updates and educational content on mushroom farming.',
+    ctaBandTitle: 'Order now!',
+    ctaBandText: 'For purchases, training and partnerships, our team responds quickly.',
+  },
+  segments: [
+    { label: 'Households' },
+    { label: 'Restaurants' },
+    { label: 'Hotels' },
+    { label: 'Supermarkets' },
+    { label: 'Retailers' },
+    { label: 'Food-processing industries' },
+  ],
+  values: [
+    { title: 'Guaranteed quality', desc: 'Fresh and processed products under strict hygiene and traceability standards.' },
+    { title: 'Local products', desc: 'Local production that feeds families and supplies Burundian businesses.' },
+    { title: 'Jobs for all', desc: 'Opportunities for young people, women and farmers in our communities.' },
+    { title: 'Environment preserved', desc: 'Full valorization of our residues: nothing is lost, everything is transformed.' },
+  ],
+  products: {
+    title: 'Our products',
+    subtitle:
+      'Fresh and processed mushrooms, ready-to-produce substrate and bio-organic fertilizers — all from our Bujumbura farm.',
+    orderNote:
+      'Prices and availability vary by season and quantity. Contact us for a tailored offer.',
+    formatsLabel: 'Packaging',
+    fertilizerTitle: 'Bio-organic fertilizers',
+    fertilizerIntro: 'Made from the valorization of used substrate, our fertilizers feed the soil sustainably.',
+    items: [
+      {
+        id: 'fresh',
+        name: 'Fresh mushrooms',
+        tagline: 'Pleurotus — natural freshness and quality',
+        description:
+          'Our Pleurotus mushrooms are harvested every day at their best and carefully delivered to preserve their freshness, texture and flavour.',
+        points: [
+          'Daily harvest at optimal maturity',
+          'Ideal for households, restaurants and hotels',
+          'Delicate flavour, rich in nutrients',
+        ],
+        formats: 'Bulk, subject to availability',
+      },
+      {
+        id: 'dried',
+        name: 'Dried mushrooms',
+        tagline: 'Long shelf life, easy to transport',
+        description:
+          'Carefully dried to concentrate their aroma, our dried mushrooms keep for a long time and travel easily.',
+        points: [
+          'Concentrated aromas, intense taste',
+          'Long shelf life',
+          'Easy to transport and store',
+        ],
+        formats: 'Custom pouches and containers',
+      },
+      {
+        id: 'powder',
+        name: 'Mushroom powder',
+        tagline: 'For sauces, soups, broths and seasonings',
+        description:
+          'A 100% natural flavour enhancer made by finely grinding our mushrooms. Ideal for professional and home kitchens alike.',
+        points: [
+          'Natural flavour enhancer, no additives',
+          'Dissolves easily in preparations',
+          'Convenient format for food industries',
+        ],
+        formats: 'Custom sachets and jars',
+      },
+      {
+        id: 'packaged',
+        name: 'Packaged mushrooms',
+        tagline: 'In 100 g, 250 g, 500 g and 1 kg sachets',
+        description:
+          'Our mushrooms packed in different sachet sizes are retail-ready, with a recognizable brand and consistent weights.',
+        points: [
+          'Retail-ready packaging',
+          'Consistent weights: 100 g to 1 kg',
+          'Uniform quality, clear labelling',
+        ],
+        formats: '100 g · 250 g · 500 g · 1 kg',
+      },
+      {
+        id: 'substrate',
+        name: 'Mushroom substrate',
+        tagline: 'Ready-to-produce bags for growers',
+        description:
+          'Start your own production with our ready-to-fruit substrate bags. We support beginners and established growers alike.',
+        points: [
+          'Ready-to-produce bags, controlled inoculation',
+          'For aspiring and experienced growers',
+          'Technical support available',
+        ],
+        formats: '2 kg to 5 kg bags',
+      },
+      {
+        id: 'fertilizer',
+        name: 'Bio-organic fertilizer',
+        tagline: 'Fertile soils, productive crops!',
+        description:
+          'Made by valorizing the substrate left after harvest, our bio-organic fertilizer sustainably improves soil fertility without any chemicals.',
+        points: [
+          'Improves soil fertility',
+          'Increases yields',
+          '100% natural, no chemicals',
+        ],
+        formats: 'Solid 50 kg · Liquid 20 L',
+      },
+    ],
+  },
+  about: {
+    title: 'About MYCOFERT Burundi',
+    intro: [
+      'MYCOFERT Burundi is an agricultural business based in Bujumbura that grows and processes edible mushrooms, supplies cultivation inputs and delivers hands-on training. From farm to table — and to the field — we add value at every step of our production.',
+      'Our name reflects our mission: mushrooms ("myco") in the service of fertility ("fert"). We grow Pleurotus mushrooms, process them into dried products and powder, pack them for retail, and convert the used substrate into solid and liquid bio-organic fertilizers.',
+      'Beyond production, we share our know-how: practical mushroom cultivation training for young people, women and farmers who want to build their own activity.',
+    ],
+    missionTitle: 'Our mission',
+    missionText:
+      'To produce healthy, affordable food, provide quality agricultural inputs and pass on skills that create sustainable incomes for Burundian communities.',
+    visionTitle: 'Our vision',
+    visionText:
+      'To become a regional reference for sustainable mushroom farming, where every harvest feeds people and every residue feeds the soil.',
+    activitiesTitle: 'Our activities',
+    activities: [
+      { title: 'Production and processing', desc: 'Fresh, dried, powdered and packaged mushrooms for every market.' },
+      { title: 'Cultivation supplies', desc: 'Ready-to-produce substrate bags for growers.' },
+      { title: 'Bio-organic fertilizers', desc: 'Solid and liquid fertilizers made from spent substrate.' },
+      { title: 'Training and education', desc: 'Hands-on programs for youth, women, farmers and organizations.' },
+    ],
+    valuesTitle: 'Our values',
+  },
+  sustainability: {
+    title: 'Our sustainability approach',
+    subtitle:
+      'At MYCOFERT Burundi, nothing goes to waste: our chain is designed so that every resource is valorized.',
+    steps: [
+      { title: 'Substrate prepared', desc: 'The nutritive substrate is prepared and bagged in our facilities, ready to fruit.' },
+      { title: 'Mushrooms cultivated', desc: 'Mushrooms grow on the substrate bags in our growing units.' },
+      { title: 'Harvest and processing', desc: 'Fresh, dried, powdered or packaged: mushrooms reach every market.' },
+      { title: 'Substrate valorized', desc: 'The spent substrate is composted and turned into solid and liquid bio-organic fertilizer.' },
+    ],
+    cycleTitle: 'A circular agriculture',
+    cycleText:
+      'After harvest, the spent substrate does not end up in a landfill. Composted and transformed, it becomes a rich fertilizer that returns to the fields: soils gain fertility, yields increase, and the cycle starts again.',
+    impactTitle: 'Our impact',
+    impact: [
+      { title: 'Waste reduced', desc: 'Full valorization of the substrate used after harvest.' },
+      { title: 'Soils regenerated', desc: 'A 100% natural, chemical-free fertilizer that feeds the soil sustainably.' },
+      { title: 'Communities strengthened', desc: 'Local jobs and skills passed on to young people and women.' },
+    ],
+  },
+  training: {
+    title: 'Mushroom cultivation training',
+    subtitle:
+      'Hands-on programs for young people, women and farmers who want to start mushroom farming.',
+    intro:
+      'Our trainings combine theory and practice on our farm: substrate preparation, seeding, growing-unit management, harvesting, drying and marketing. Every participant leaves with the foundations to start their own production.',
+    programTitle: 'What you will learn',
+    program: [
+      'Substrate preparation and pasteurization',
+      'Seeding and bag incubation',
+      'Managing humidity, temperature and light',
+      'Harvesting, drying and packaging',
+      'Turning spent substrate into fertilizer',
+      'Marketing basics and cost calculation',
+    ],
+    audienceTitle: 'Who is it for?',
+    audience: [
+      { title: 'Youth and entrepreneurs', desc: 'Build your own production unit and a sustainable income.' },
+      { title: 'Women and community groups', desc: 'A low-investment activity, well suited to cooperatives.' },
+      { title: 'Farmers and organizations', desc: 'Diversify your income and enrich your soils with your own residues.' },
+    ],
+    ctaTitle: 'Interested in a training?',
+    ctaText:
+      'Tell us your profile and your project: we will send you the program, upcoming dates and how to register.',
+  },
+  news: {
+    title: 'News and resources',
+    subtitle: 'Company updates, agricultural education and announcements.',
+    readMore: 'Read more',
+    back: 'Back to news',
+    items: [
+      {
+        slug: 'formation-cohorte',
+        date: 'October 2026',
+        title: 'New mushroom cultivation training cohort',
+        excerpt:
+          'Registration is open for the next training session for young people, women and farmers.',
+        body: [
+          'MYCOFERT Burundi has opened registration for its next mushroom cultivation training session. The program combines theory and hands-on practice on our Bujumbura farm: substrate preparation, seeding, growing-unit management, harvesting and marketing.',
+          'The training is primarily intended for young people, women and farmer groups who want to create their own activity. Places are limited, so we encourage anyone interested to contact us now through the contact form or WhatsApp.',
+        ],
+      },
+      {
+        slug: 'poudre-usage',
+        date: 'September 2026',
+        title: 'Mushroom powder: the ally of your recipes',
+        excerpt:
+          'Sauces, soups, broths and seasonings: how to use our 100% natural powder every day.',
+        body: [
+          'Mushroom powder is a natural flavour enhancer obtained by finely grinding dried mushrooms. One spoonful is enough to enrich a sauce, soup or broth with umami flavour — with no additives or artificial enhancers.',
+          'For restaurants, hotels and food-processing businesses, it offers a convenient format and consistent quality. Contact us to discover our formats for professionals.',
+        ],
+      },
+      {
+        slug: 'substrat-engrais',
+        date: 'August 2026',
+        title: 'From spent substrate to fertile soil',
+        excerpt:
+          'Discover our circular agriculture approach: turning harvest residues into bio-organic fertilizer.',
+        body: [
+          'After harvest, substrate bags are not waste. Composted and transformed, they become a solid and liquid bio-organic fertilizer that improves soil fertility and increases yields — without chemicals.',
+          'This circular approach reduces our waste, regenerates soils and gives farmers a natural, affordable alternative to synthetic fertilizers.',
+        ],
+      },
+    ],
+  },
+  contact: {
+    title: 'Contact and inquiries',
+    subtitle:
+      'For purchases, training and partnerships — reach us by phone, WhatsApp or through the form below.',
+    formTitle: 'Inquiry form',
+    formSubtitle:
+      'Specify the subject of your inquiry: our team will get back to you as soon as possible.',
+    locationTitle: 'Bujumbura, Burundi',
+    locationText: 'We welcome visitors by appointment at our farm in Bujumbura.',
+    whatsappTitle: 'WhatsApp',
+    whatsappText: 'The fastest way to place an order.',
+  },
+  form: {
+    name: 'Full name',
+    namePlaceholder: 'Your name',
+    phone: 'Phone / WhatsApp',
+    phonePlaceholder: '+257 ...',
+    email: 'Email (optional)',
+    emailPlaceholder: 'you@example.com',
+    subject: 'Subject of inquiry',
+    subjects: {
+      product: 'Product information',
+      bulk: 'Bulk supply',
+      fertilizer: 'Bio-organic fertilizer',
+      training: 'Training',
+      partnership: 'Partnership',
+    },
+    product: 'Product concerned',
+    productPlaceholder: 'Select a product (optional)',
+    productNone: '—',
+    message: 'Message',
+    messagePlaceholder: 'Describe your need: quantities, use case, timeline...',
+    submit: 'Send inquiry',
+    submitting: 'Sending...',
+    successTitle: 'Inquiry sent!',
+    successBody: 'Thank you! Our team will contact you very soon.',
+    errorTitle: 'Submission failed',
+    errorBody: 'Something went wrong. Please try again or reach us on WhatsApp.',
+    invalidPhone: 'Please provide a valid phone number.',
+  },
+  footer: {
+    explore: 'Explore',
+    productsCol: 'Products',
+    contactCol: 'Contact',
+    rights: 'All rights reserved.',
+    adminLink: 'Team area',
+  },
+  admin: {
+    title: 'Team area',
+    subtitle: 'Dashboard for inquiries and website visits.',
+    passcode: 'Passcode',
+    passcodePlaceholder: 'Enter passcode',
+    login: 'Sign in',
+    logout: 'Sign out',
+    wrongPasscode: 'Incorrect passcode.',
+    statTotal: 'Total inquiries',
+    statNew: 'New inquiries',
+    statPageviews: 'Page views',
+    statTop: 'Most viewed pages',
+    byType: 'Inquiries by subject',
+    inquiriesTitle: 'Received inquiries',
+    filterAll: 'All',
+    colDate: 'Date',
+    colName: 'Name',
+    colPhone: 'Phone',
+    colSubject: 'Subject',
+    colProduct: 'Product',
+    colMessage: 'Message',
+    colStatus: 'Status',
+    statusNew: 'New',
+    statusHandled: 'Handled',
+    markHandled: 'Mark handled',
+    markNew: 'Reopen',
+    exportCsv: 'Export CSV',
+    noData: 'No inquiries yet.',
+    langCol: 'Language',
+  },
+};
