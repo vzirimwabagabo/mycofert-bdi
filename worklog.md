@@ -26,3 +26,22 @@ Stage Summary:
 - Admin passcode: mycofert2026 (override via ADMIN_PASSCODE env).
 - Contact details are placeholders from the poster — update in src/lib/site.ts when the client confirms real numbers.
 - Out of scope per spec (not built): checkout, payments, inventory, customer portals.
+
+---
+Task ID: 2
+Agent: main (Z.ai)
+Task: Fix reported React hydration error ("server rendered Welcome / client rendered Accueil") and re-verify the full bilingual site.
+
+Work Log:
+- Diagnosis: "Welcome" exists nowhere in current source — it came from stale English-era server HTML in the user's browser being hydrated by the new bilingual client code (dev.log showed "Fast Refresh had to perform a full reload due to a runtime error" at that moment). Underlying fragility: SiteProvider read localStorage + window.location.hash via useSyncExternalStore during render, so any server/client divergence surfaced as a hydration mismatch.
+- Hardened src/components/site/context.tsx: replaced the two render-time stores with one module-level external store whose snapshot is { hash: '', storedLang: null } on BOTH server and first client render (guaranteed match); real hash + localStorage preference are adopted once AFTER hydration from a mount effect (external-store mutation, no setState-in-effect, lint-clean); hashchange listener added post-hydration; removed subscribeNoop store entirely.
+- Bonus spec alignment: bare "/" (or any lang-less hash except #/admin) is now promoted via location.replace() to a dedicated language URL (#/fr or #/en per stored preference) — language URLs always explicit after load; setLang on #/admin now applies the new language immediately via the store instead of requiring a reload.
+- next.config.ts: added allowedDevOrigins ["*.space-z.ai"] to fix the cross-origin preview warning for /_next/* dev resources.
+- Lint: clean (bun run lint, zero errors/warnings). Dev server restarted cleanly after config change.
+- agent-browser E2E all PASSED with zero console errors/hydration warnings: (A) fresh "/" renders FR and URL promotes to #/fr; (B) hard reload on #/en renders EN, no mismatch; (C) stored mycofert-lang=en + bare "/" renders EN and promotes URL to #/en — the exact scenario class the user reported, now clean; (D) header language switch FR↔EN updates URL + content; (E) contact form: all 5 Radix subjects selectable, validation OK, POST /api/inquiries 200, DB row written (verified type/lang/message), fields cleared on success; real mouse click after smooth-scroll settles works (mid-animation clicks are a test artifact only); (F) admin login mycofert2026 shows stats + new rows; (G) mobile 390x844 renders with menu, URL promotion works.
+- Deleted the 2 test inquiry rows ("Test Hydratation", "Click Test") created during verification to keep the dev DB tidy.
+
+Stage Summary:
+- Hydration mismatch eliminated structurally: first client render can never diverge from server HTML; client-only preferences apply post-hydration as normal updates.
+- Files changed: src/components/site/context.tsx (external store rewrite), next.config.ts (allowedDevOrigins).
+- Admin passcode unchanged: mycofert2026. Contact placeholders unchanged (src/lib/site.ts) pending client confirmation.

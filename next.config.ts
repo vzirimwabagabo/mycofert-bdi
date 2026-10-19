@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  // Allow the IM preview proxy origins to load /_next/* dev resources.
+  allowedDevOrigins: ["*.space-z.ai"],
 };
 
 export default nextConfig;

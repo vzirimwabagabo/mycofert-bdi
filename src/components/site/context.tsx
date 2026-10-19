@@ -63,25 +63,61 @@ export function hrefFor(lang: Lang, page: PageId, slug?: string): string {
   return `#/${lang}/${page}`;
 }
 
-function subscribeHash(cb: () => void) {
-  window.addEventListener('hashchange', cb);
-  return () => window.removeEventListener('hashchange', cb);
-}
-const getHashSnapshot = () => window.location.hash;
-const getHashServer = () => '';
+// ---------------------------------------------------------------------------
+// External store for client-only routing state (window.location.hash + the
+// stored language preference).
+//
+// Hydration safety: the snapshot is EMPTY on the server AND during the
+// client's first (hydration) render, so the server HTML and the first client
+// render always match exactly. Real browser state is adopted once AFTER
+// hydration from a useEffect — any resulting difference is a normal
+// post-hydration re-render, never a hydration mismatch. (Reading
+// localStorage/location during the hydration render is the classic cause of
+// "server rendered text didn't match the client" errors.)
+// ---------------------------------------------------------------------------
 
-function subscribeNoop() {
-  return () => {};
+const LANG_KEY = 'mycofert-lang';
+
+interface ExtState {
+  hash: string;
+  storedLang: Lang | null;
 }
-const getStoredLang = (): Lang => {
+
+const INITIAL_EXT_STATE: ExtState = { hash: '', storedLang: null };
+
+let extState: ExtState = INITIAL_EXT_STATE;
+const extListeners = new Set<() => void>();
+
+function notifyExt() {
+  extListeners.forEach((listener) => listener());
+}
+
+function readStoredLang(): Lang | null {
   try {
-    const v = window.localStorage.getItem('mycofert-lang');
-    return isLang(v) ? v : DEFAULT_LANG;
+    const v = window.localStorage.getItem(LANG_KEY);
+    return isLang(v) ? v : null;
   } catch {
-    return DEFAULT_LANG;
+    return null;
   }
-};
-const getStoredLangServer = (): Lang => DEFAULT_LANG;
+}
+
+/** Adopt real browser state into the store. Call from effects/handlers only. */
+function syncExtState() {
+  const hash = window.location.hash;
+  const storedLang = readStoredLang();
+  if (hash === extState.hash && storedLang === extState.storedLang) return;
+  extState = { hash, storedLang };
+  notifyExt();
+}
+
+function subscribeExt(cb: () => void) {
+  extListeners.add(cb);
+  return () => {
+    extListeners.delete(cb);
+  };
+}
+const getExtSnapshot = (): ExtState => extState;
+const getExtServerSnapshot = (): ExtState => INITIAL_EXT_STATE;
 
 interface SiteCtx {
   route: Route;
@@ -94,10 +130,26 @@ interface SiteCtx {
 const Ctx = createContext<SiteCtx | null>(null);
 
 export function SiteProvider({ children }: { children: React.ReactNode }) {
-  const hash = useSyncExternalStore(subscribeHash, getHashSnapshot, getHashServer);
-  const storedLang = useSyncExternalStore(subscribeNoop, getStoredLang, getStoredLangServer);
+  const ext = useSyncExternalStore(subscribeExt, getExtSnapshot, getExtServerSnapshot);
 
-  const route = parseHash(hash, storedLang);
+  const route = parseHash(ext.hash, ext.storedLang ?? DEFAULT_LANG);
+
+  // Adopt real hash + stored language AFTER hydration, then keep in sync.
+  useEffect(() => {
+    syncExtState();
+    const onHash = () => syncExtState();
+    window.addEventListener('hashchange', onHash);
+
+    // Dedicated language URLs: promote hashes without a language segment
+    // (bare "/") to an explicit #/fr or #/en URL — but never hijack #/admin.
+    const raw = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+    if (raw !== 'admin' && !isLang(raw.split('/')[0] ?? '')) {
+      const lang = readStoredLang() ?? DEFAULT_LANG;
+      window.location.replace(hrefFor(lang, 'home'));
+    }
+
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   // Per-language document metadata + first-party analytics (external systems only).
   useEffect(() => {
@@ -134,11 +186,14 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
   const setLang = useCallback(
     (next: Lang) => {
       try {
-        window.localStorage.setItem('mycofert-lang', next);
+        window.localStorage.setItem(LANG_KEY, next);
       } catch {
         /* storage unavailable */
       }
-      if (route.isAdmin) return;
+      if (route.isAdmin) {
+        syncExtState(); // admin hash has no lang segment — apply via stored preference
+        return;
+      }
       const target = hrefFor(next, route.page, route.slug);
       if (window.location.hash !== target) {
         window.location.hash = target.slice(1);
