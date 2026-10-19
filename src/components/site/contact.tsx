@@ -3,12 +3,15 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Mail, MapPin, MessageCircle, Phone } from 'lucide-react';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { PageHero } from './bits';
 import { InquiryForm } from './inquiry-form';
-import { SITE, telLink, waLink } from '@/lib/site';
+import { telLink, waLink } from '@/lib/site';
 
 export function ContactPage() {
   const { t, lang } = useSite();
+  const { settings } = useCms();
+  const contact = settings.contact;
 
   return (
     <div>
@@ -21,7 +24,7 @@ export function ContactPage() {
             <Phone className="h-7 w-7 text-[#2F6B3F]" aria-hidden="true" />
             <h2 className="mt-3 font-semibold">{t.common.phoneLabel}</h2>
             <div className="mt-2 space-y-1 text-sm">
-              {SITE.phones.map((p) => (
+              {contact.phones.map((p) => (
                 <a key={p.tel} href={telLink(p.tel)} className="block text-muted-foreground hover:text-foreground">
                   {p.label}
                 </a>
@@ -34,7 +37,7 @@ export function ContactPage() {
             <h2 className="mt-3 font-semibold">{t.contact.whatsappTitle}</h2>
             <p className="mt-2 text-sm text-muted-foreground">{t.contact.whatsappText}</p>
             <a
-              href={waLink(lang)}
+              href={waLink(lang, undefined, false, contact.whatsappNumber)}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-block text-sm font-medium text-[#2F6B3F] hover:underline"
@@ -47,10 +50,10 @@ export function ContactPage() {
             <Mail className="h-7 w-7 text-[#2F6B3F]" aria-hidden="true" />
             <h2 className="mt-3 font-semibold">{t.common.email}</h2>
             <a
-              href={`mailto:${SITE.email}`}
+              href={`mailto:${contact.email}`}
               className="mt-2 block break-all text-sm text-muted-foreground hover:text-foreground"
             >
-              {SITE.email}
+              {contact.email}
             </a>
           </Card>
 
@@ -60,7 +63,7 @@ export function ContactPage() {
             <p className="mt-2 text-sm text-muted-foreground">{t.contact.locationText}</p>
             <p className="mt-3 text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{t.common.hoursLabel}: </span>
-              {t.common.hoursValue}
+              {pick(contact.hours, lang)}
             </p>
           </Card>
         </div>

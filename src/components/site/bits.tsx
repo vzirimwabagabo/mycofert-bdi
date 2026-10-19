@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useSite } from './context';
+import { useCms } from './cms';
 import { waLink } from '@/lib/site';
 import { MessageCircle, Phone } from 'lucide-react';
 import { SITE } from '@/lib/site';
@@ -74,16 +75,19 @@ export function CtaPair({
   size?: 'default' | 'lg';
 }) {
   const { t, lang, navigate } = useSite();
+  const { settings } = useCms();
+  const contact = settings.contact;
+  const firstPhone = contact.phones[0]?.tel || SITE.phones[0].tel;
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button asChild size={size} className="bg-[#2F6B3F] hover:bg-[#275A34] text-white">
-        <a href={waLink(lang, product, quote)} target="_blank" rel="noopener noreferrer">
+        <a href={waLink(lang, product, quote, contact.whatsappNumber)} target="_blank" rel="noopener noreferrer">
           <MessageCircle className="mr-2 h-4 w-4" aria-hidden="true" />
           {quote ? t.common.requestQuote : t.common.orderWhatsapp}
         </a>
       </Button>
       <Button asChild size={size} variant="outline" className="border-[#2F6B3F]/40 text-[#2F6B3F] hover:bg-[#2F6B3F]/10">
-        <a href={telLinkFirst()}>
+        <a href={`tel:${firstPhone}`}>
           <Phone className="mr-2 h-4 w-4" aria-hidden="true" />
           {t.common.call}
         </a>
@@ -92,8 +96,10 @@ export function CtaPair({
   );
 }
 
-function telLinkFirst() {
-  return `tel:${SITE.phones[0].tel}`;
+// Kept for reference: resolves the owner-editable first phone.
+export function useFirstPhone(): string {
+  const { settings } = useCms();
+  return settings.contact.phones[0]?.tel || SITE.phones[0].tel;
 }
 
 /** Slim hero band used at the top of inner pages. */

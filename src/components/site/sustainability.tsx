@@ -4,16 +4,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Recycle, ArrowDown, Package, Sprout, ShoppingBasket } from 'lucide-react';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
 
 const STEP_ICONS = [Package, Sprout, ShoppingBasket, Recycle];
 
 export function SustainabilityPage() {
-  const { t } = useSite();
+  const { t, lang } = useSite();
+  const { settings } = useCms();
+  const s = settings.sustainability;
 
   return (
     <div>
-      <PageHero title={t.sustainability.title} subtitle={t.sustainability.subtitle} />
+      <PageHero title={pick(s.title, lang)} subtitle={pick(s.subtitle, lang)} />
 
       {/* Process steps */}
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
@@ -61,7 +64,7 @@ export function SustainabilityPage() {
               <Recycle className="h-3.5 w-3.5" aria-hidden="true" /> {t.nav.sustainability}
             </Badge>
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{t.sustainability.cycleTitle}</h2>
-            <p className="mt-4 leading-relaxed text-muted-foreground">{t.sustainability.cycleText}</p>
+            <p className="mt-4 leading-relaxed text-muted-foreground">{pick(s.cycleText, lang)}</p>
           </div>
         </div>
       </section>

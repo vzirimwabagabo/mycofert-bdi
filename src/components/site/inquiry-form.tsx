@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { Send } from 'lucide-react';
 
 export type InquiryType = 'product' | 'bulk' | 'fertilizer' | 'training' | 'partnership';
@@ -30,6 +31,7 @@ export function InquiryForm({
   compact?: boolean;
 }) {
   const { t, lang } = useSite();
+  const { products } = useCms();
   const { toast } = useToast();
 
   const [name, setName] = useState('');
@@ -42,8 +44,8 @@ export function InquiryForm({
   const [phoneError, setPhoneError] = useState(false);
 
   const productOptions = useMemo(
-    () => t.products.items.map((p) => ({ id: p.id, name: p.name })),
-    [t]
+    () => products.map((p) => ({ id: p.slug, name: pick(p.name, lang) })),
+    [products, lang]
   );
 
   async function handleSubmit(e: React.FormEvent) {

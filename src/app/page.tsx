@@ -1,6 +1,7 @@
 'use client';
 
 import { SiteProvider, useSite } from '@/components/site/context';
+import { CmsProvider } from '@/components/site/cms';
 import { Header } from '@/components/site/header';
 import { Footer, WhatsAppFloat } from '@/components/site/footer';
 import { HomePage } from '@/components/site/home';
@@ -39,14 +40,16 @@ function Router() {
 export default function Page() {
   return (
     <SiteProvider>
-      <div className="flex min-h-screen flex-col">
-        <Header />
-        <main className="flex-1">
-          <Router />
-        </main>
-        <Footer />
-        <WhatsAppFloat />
-      </div>
+      <CmsProvider>
+        <div className="flex min-h-screen flex-col">
+          <Header />
+          <main className="flex-1">
+            <Router />
+          </main>
+          <Footer />
+          <WhatsAppFloat />
+        </div>
+      </CmsProvider>
     </SiteProvider>
   );
 }

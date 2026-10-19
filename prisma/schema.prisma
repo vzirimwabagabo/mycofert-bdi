@@ -1,5 +1,13 @@
 // Prisma schema for MYCOFERT Burundi website
-// SQLite datasource configured via DATABASE_URL in .env
+//
+// Database providers:
+//   - Local sandbox / development : SQLite (current)
+//   - Production (Supabase)       : PostgreSQL
+//
+// To switch to Supabase, change the provider below to "postgresql" and point
+// DATABASE_URL at the Supabase connection string, then run `bun run db:push`.
+// The models below only use portable scalar types (String / Int / Boolean /
+// DateTime), so the same schema works on both providers unchanged.
 
 generator client {
   provider = "prisma-client-js"
@@ -8,6 +16,7 @@ generator client {
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
+  // provider = "postgresql"  // <- enable this line for Supabase and disable "sqlite"
 }
 
 // Inquiries submitted from the website forms.
@@ -32,4 +41,57 @@ model PageView {
   path      String
   lang      String   @default("fr")
   createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Content management (edited by the owner from the admin dashboard)
+// ---------------------------------------------------------------------------
+
+// Key/value store for editable site texts and contact details.
+// Keys: "contact" | "home" | "training" | "about" | "sustainability" | "seeded"
+// value is a JSON string; bilingual fields are stored as { "fr": "...", "en": "..." }.
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Products displayed on the site (fresh mushrooms, dried, powder, ...).
+// Points and formats are free text; points use one item per line.
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  sortOrder   Int      @default(0)
+  published   Boolean  @default(true)
+  imageKey    String   @default("fresh")
+  nameFr      String
+  nameEn      String
+  taglineFr   String   @default("")
+  taglineEn   String   @default("")
+  descFr      String   @default("")
+  descEn      String   @default("")
+  pointsFr    String   @default("")
+  pointsEn    String   @default("")
+  formatsFr   String   @default("")
+  formatsEn   String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// News / blog articles. Body paragraphs are separated by a blank line.
+model NewsPost {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  published Boolean  @default(true)
+  imageKey  String   @default("training")
+  dateFr    String   @default("")
+  dateEn    String   @default("")
+  titleFr   String
+  titleEn   String
+  excerptFr String   @default("")
+  excerptEn String   @default("")
+  bodyFr    String   @default("")
+  bodyEn    String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

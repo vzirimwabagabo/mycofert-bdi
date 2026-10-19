@@ -2,9 +2,10 @@
 
 import { Separator } from '@/components/ui/separator';
 import { useSite, hrefFor, type PageId } from './context';
+import { useCms, pick } from './cms';
 import { Logo, Wordmark } from './bits';
 import { Mail, MapPin, Phone, MessageCircle, Lock } from 'lucide-react';
-import { SITE, telLink } from '@/lib/site';
+import { telLink } from '@/lib/site';
 
 const LINKS: { page: PageId; key: 'home' | 'products' | 'about' | 'sustainability' | 'training' | 'news' | 'contact' }[] = [
   { page: 'home', key: 'home' },
@@ -16,17 +17,10 @@ const LINKS: { page: PageId; key: 'home' | 'products' | 'about' | 'sustainabilit
   { page: 'contact', key: 'contact' },
 ];
 
-const PRODUCT_LINKS: { id: string; idx: number }[] = [
-  { id: 'fresh', idx: 0 },
-  { id: 'dried', idx: 1 },
-  { id: 'powder', idx: 2 },
-  { id: 'packaged', idx: 3 },
-  { id: 'substrate', idx: 4 },
-  { id: 'fertilizer', idx: 5 },
-];
-
 export function Footer() {
   const { t, lang, navigate } = useSite();
+  const { settings, products } = useCms();
+  const contact = settings.contact;
   const year = new Date().getFullYear();
 
   return (
@@ -67,7 +61,7 @@ export function Footer() {
         <nav aria-label={t.footer.productsCol}>
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">{t.footer.productsCol}</h3>
           <ul className="space-y-2 text-sm">
-            {PRODUCT_LINKS.map((p) => (
+            {products.slice(0, 6).map((p) => (
               <li key={p.id}>
                 <a
                   href={hrefFor(lang, 'products')}
@@ -77,7 +71,7 @@ export function Footer() {
                   }}
                   className="text-white/75 transition-colors hover:text-white"
                 >
-                  {t.products.items[p.idx].name}
+                  {pick(p.name, lang)}
                 </a>
               </li>
             ))}
@@ -90,7 +84,7 @@ export function Footer() {
             <li className="flex items-start gap-2">
               <Phone className="mt-0.5 h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
               <span className="flex flex-col">
-                {SITE.phones.map((p) => (
+                {contact.phones.map((p) => (
                   <a key={p.tel} href={telLink(p.tel)} className="text-white/75 hover:text-white">
                     {p.label}
                   </a>
@@ -100,7 +94,7 @@ export function Footer() {
             <li className="flex items-start gap-2">
               <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
               <a
-                href={`https://wa.me/${SITE.whatsappNumber}`}
+                href={`https://wa.me/${contact.whatsappNumber}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white/75 hover:text-white"
@@ -110,14 +104,14 @@ export function Footer() {
             </li>
             <li className="flex items-start gap-2">
               <Mail className="mt-0.5 h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
-              <a href={`mailto:${SITE.email}`} className="text-white/75 hover:text-white">
-                {SITE.email}
+              <a href={`mailto:${contact.email}`} className="text-white/75 hover:text-white">
+                {contact.email}
               </a>
             </li>
             <li className="flex items-start gap-2">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-white/60" aria-hidden="true" />
               <span className="text-white/75">
-                {SITE.city} — {SITE.country}
+                {contact.city} — {contact.country}
               </span>
             </li>
           </ul>
@@ -146,10 +140,12 @@ export function Footer() {
 /** Floating WhatsApp quick-order button, hidden on the admin page. */
 export function WhatsAppFloat() {
   const { lang, t, route } = useSite();
+  const { settings } = useCms();
+  const number = settings.contact.whatsappNumber;
   if (route.isAdmin) return null;
   return (
     <a
-      href={`https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(
+      href={`https://wa.me/${number}?text=${encodeURIComponent(
         lang === 'en' ? 'Hello MYCOFERT Burundi, I would like to place an order.' : 'Bonjour MYCOFERT Burundi, je souhaite passer une commande.'
       )}`}
       target="_blank"

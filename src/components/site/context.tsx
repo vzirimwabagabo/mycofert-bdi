@@ -152,14 +152,13 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Per-language document metadata + first-party analytics (external systems only).
+  // Note: news-post pages set their own document title (see NewsPostPage),
+  // because parent effects run after child effects and would overwrite it.
   useEffect(() => {
     if (route.isAdmin) return;
     const t = getDict(route.lang);
     document.documentElement.lang = route.lang;
-    if (route.page === 'news-post') {
-      const post = t.news.items.find((p) => p.slug === route.slug);
-      document.title = post ? `${post.title} — MYCOFERT Burundi` : `${t.news.title} — MYCOFERT Burundi`;
-    } else {
+    if (route.page !== 'news-post') {
       document.title = t.meta.title;
     }
     const controller = new AbortController();

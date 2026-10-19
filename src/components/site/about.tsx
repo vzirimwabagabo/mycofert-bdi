@@ -4,12 +4,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BadgeCheck, Sprout, Users, Leaf, Quote, Package, Recycle, GraduationCap } from 'lucide-react';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
 
 const ACTIVITY_ICONS = [Package, Sprout, Recycle, GraduationCap];
 
 export function AboutPage() {
-  const { t } = useSite();
+  const { t, lang } = useSite();
+  const { settings } = useCms();
+  const about = settings.about;
 
   return (
     <div>
@@ -42,13 +45,13 @@ export function AboutPage() {
             <Badge variant="secondary" className="mb-4 bg-[#6FA84C]/15 text-[#2F6B3F]">
               {t.about.missionTitle}
             </Badge>
-            <p className="leading-relaxed text-foreground/90">{t.about.missionText}</p>
+            <p className="leading-relaxed text-foreground/90">{pick(about.missionText, lang)}</p>
           </Card>
           <Card className="border-border/70 p-8">
             <Badge variant="secondary" className="mb-4 bg-[#6FA84C]/15 text-[#2F6B3F]">
               {t.about.visionTitle}
             </Badge>
-            <p className="leading-relaxed text-foreground/90">{t.about.visionText}</p>
+            <p className="leading-relaxed text-foreground/90">{pick(about.visionText, lang)}</p>
           </Card>
         </div>
       </section>

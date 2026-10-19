@@ -7,7 +7,10 @@ import {
   CardContent,
 } from '@/components/ui/card';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { SectionHeading, CtaPair } from './bits';
+import { imageSrc } from '@/lib/cms-defaults';
+import { waLink } from '@/lib/site';
 import {
   Bed,
   Factory,
@@ -29,7 +32,11 @@ import {
 const SEGMENT_ICONS = [House, UtensilsCrossed, Bed, ShoppingCart, Store, Factory];
 
 export function HomePage() {
-  const { t, navigate } = useSite();
+  const { t, lang, navigate } = useSite();
+  const { settings, products, news } = useCms();
+  const home = settings.home;
+  const contact = settings.contact;
+  const L = (text: { fr: string; en: string }) => pick(text, lang);
 
   return (
     <div>
@@ -44,18 +51,18 @@ export function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-r from-[#1B3A24]/90 via-[#1B3A24]/70 to-transparent" />
         <div className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
           <Badge className="mb-5 bg-[#6FA84C] text-white hover:bg-[#6FA84C]">
-            {t.home.heroBadge}
+            {L(home.heroBadge)}
           </Badge>
           <h1 className="max-w-2xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
-            {t.home.heroTitle}
+            {L(home.heroTitle)}
           </h1>
-          <p className="mt-5 max-w-xl text-lg text-white/85">{t.home.heroSubtitle}</p>
+          <p className="mt-5 max-w-xl text-lg text-white/85">{L(home.heroSubtitle)}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" className="bg-white text-[#2F6B3F] hover:bg-white/90" onClick={() => navigate('products')}>
               {t.common.seeProducts}
             </Button>
             <a
-              href="https://wa.me/25779000000"
+              href={waLink(lang, undefined, false, contact.whatsappNumber)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-11 items-center rounded-md border border-white/60 bg-transparent px-8 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -66,9 +73,9 @@ export function HomePage() {
           </div>
           <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6">
             {[
-              { n: '6+', label: t.home.heroStat1 },
-              { n: '6', label: t.home.heroStat2 },
-              { n: '100%', label: t.home.heroStat3 },
+              { n: '6+', label: L(home.stat1) },
+              { n: '6', label: L(home.stat2) },
+              { n: '100%', label: L(home.stat3) },
             ].map((s) => (
               <div key={s.label}>
                 <dt className="sr-only">{s.label}</dt>
@@ -84,22 +91,22 @@ export function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <SectionHeading title={t.home.categoriesTitle} subtitle={t.home.categoriesSubtitle} />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {t.products.items.map((item, i) => (
+          {products.map((item) => (
             <Card
               key={item.id}
               className="group overflow-hidden border-border/70 transition-shadow hover:shadow-md"
             >
               <div className="aspect-[16/10] overflow-hidden bg-secondary">
                 <img
-                  src={`/images/${item.id}.png`}
-                  alt={item.name}
+                  src={imageSrc(item.imageKey)}
+                  alt={L(item.name)}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
               </div>
               <CardContent className="p-5">
-                <h3 className="text-lg font-semibold">{item.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{item.tagline}</p>
+                <h3 className="text-lg font-semibold">{L(item.name)}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{L(item.tagline)}</p>
               </CardContent>
             </Card>
           ))}
@@ -212,11 +219,11 @@ export function HomePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <SectionHeading title={t.home.newsTitle} subtitle={t.home.newsSubtitle} />
           <div className="grid gap-5 md:grid-cols-3">
-            {t.news.items.map((post, i) => (
-              <Card key={post.slug} className="overflow-hidden border-border/70 transition-shadow hover:shadow-md">
+            {news.slice(0, 3).map((post) => (
+              <Card key={post.id} className="overflow-hidden border-border/70 transition-shadow hover:shadow-md">
                 <div className="aspect-[16/9] bg-secondary">
                   <img
-                    src={['/images/training.png', '/images/powder.png', '/images/fertilizer.png'][i]}
+                    src={imageSrc(post.imageKey)}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"
@@ -225,10 +232,10 @@ export function HomePage() {
                 </div>
                 <CardContent className="p-5">
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Newspaper className="h-3.5 w-3.5" aria-hidden="true" /> {post.date}
+                    <Newspaper className="h-3.5 w-3.5" aria-hidden="true" /> {L(post.date)}
                   </p>
-                  <h3 className="mt-2 line-clamp-2 font-semibold">{post.title}</h3>
-                  <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{post.excerpt}</p>
+                  <h3 className="mt-2 line-clamp-2 font-semibold">{L(post.title)}</h3>
+                  <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{L(post.excerpt)}</p>
                   <button
                     onClick={() => navigate('news-post', post.slug)}
                     className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#2F6B3F] hover:underline"

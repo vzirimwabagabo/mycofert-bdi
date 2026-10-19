@@ -4,15 +4,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, GraduationCap } from 'lucide-react';
 import { useSite } from './context';
+import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
 import { InquiryForm } from './inquiry-form';
 
 export function TrainingPage() {
-  const { t } = useSite();
+  const { t, lang } = useSite();
+  const { settings } = useCms();
+  const training = settings.training;
 
   return (
     <div>
-      <PageHero title={t.training.title} subtitle={t.training.subtitle} />
+      <PageHero title={pick(training.title, lang)} subtitle={pick(training.subtitle, lang)} />
 
       {/* Intro */}
       <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
@@ -20,7 +23,7 @@ export function TrainingPage() {
           <div className="overflow-hidden rounded-2xl">
             <img
               src="/images/training.png"
-              alt={t.training.title}
+              alt={pick(training.title, lang)}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"
             />
@@ -29,7 +32,7 @@ export function TrainingPage() {
             <Badge variant="secondary" className="mb-4 gap-1 bg-[#6FA84C]/15 text-[#2F6B3F]">
               <GraduationCap className="h-3.5 w-3.5" aria-hidden="true" /> {t.nav.training}
             </Badge>
-            <p className="leading-relaxed text-muted-foreground">{t.training.intro}</p>
+            <p className="leading-relaxed text-muted-foreground">{pick(training.intro, lang)}</p>
           </div>
         </div>
       </section>

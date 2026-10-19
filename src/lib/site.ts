@@ -15,8 +15,10 @@ export const WHATSAPP_MESSAGES: Record<string, string> = {
   en: 'Hello MYCOFERT Burundi, I would like to place an order.',
 };
 
-/** Build a wa.me link with an optional product name appended. */
-export function waLink(lang: string, product?: string, quote = false): string {
+/** Build a wa.me link with an optional product name appended.
+ *  `whatsapp` overrides the default number (used when the owner edits
+ *  contact details from the admin dashboard). */
+export function waLink(lang: string, product?: string, quote = false, whatsapp?: string): string {
   const base =
     lang === 'en'
       ? quote
@@ -26,7 +28,8 @@ export function waLink(lang: string, product?: string, quote = false): string {
         ? 'Bonjour MYCOFERT Burundi, je souhaite demander un devis pour : '
         : 'Bonjour MYCOFERT Burundi, je souhaite commander : ';
   const text = product ? `${base}${product}` : WHATSAPP_MESSAGES[lang] ?? WHATSAPP_MESSAGES.fr;
-  return `https://wa.me/${SITE.whatsappNumber}?text=${encodeURIComponent(text)}`;
+  const number = whatsapp && whatsapp.replace(/\D/g, '') ? whatsapp.replace(/\D/g, '') : SITE.whatsappNumber;
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 }
 
 export function telLink(tel: string): string {
