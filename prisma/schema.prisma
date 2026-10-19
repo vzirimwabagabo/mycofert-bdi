@@ -1,0 +1,25 @@
+// Prisma schema for MYCOFERT Burundi website
+// SQLite datasource configured via DATABASE_URL in .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Inquiries submitted from the website contact/order forms.
+// type: "order" (product purchase) | "quote" (wholesale quotation) | "training" | "partnership"
+model Inquiry {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  type      String
+  product   String?
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+}
