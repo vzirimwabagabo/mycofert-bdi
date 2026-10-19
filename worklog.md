@@ -45,3 +45,22 @@ Stage Summary:
 - Hydration mismatch eliminated structurally: first client render can never diverge from server HTML; client-only preferences apply post-hydration as normal updates.
 - Files changed: src/components/site/context.tsx (external store rewrite), next.config.ts (allowedDevOrigins).
 - Admin passcode unchanged: mycofert2026. Contact placeholders unchanged (src/lib/site.ts) pending client confirmation.
+
+---
+Task ID: 3
+Agent: main (Z.ai)
+Task: Act as a consultant and produce a French requirements document (cahier des charges) for the MYCOFERT Burundi website, to serve as a model example of how a website requirements document should look.
+
+Work Log:
+- Loaded pdf skill; routed to Report brief (ReportLab). Read the full skill chain: SKILL.md, configs/fonts.md, briefs/report.md, typesetting/{palette,cover,cover-backgrounds,overflow,pagination,typography,fill-engine}.md.
+- Palette: design_engine palette-cascade --intent nature --mode minimal --seed 42 (forest-green family matching MYCOFERT brand); colors used exclusively from cascade output (ReportLab + CSS cover aliases).
+- Body: scripts/cdc_body.py — TocDocTemplate + multiBuild, FreeSerif family + NotoSerifSC fallback + install_font_fallback, French formal consulting tone. Content: 8 chapters (contexte, objectifs/KPI, périmètre + exclusions contractuelles incl. garde-fou anti-promesse d'export, 25 exigences fonctionnelles numérotées NAV/LIN/PRD/FOR/ADM/ANA/ACT priorisées MoSCoW, exigences non fonctionnelles, direction artistique, contenus/responsabilités, planning/recette en 5 phases) + Annexe A (récits utilisateurs des 6 segments) + Annexe B (matrice de couverture 25 lignes = instrument de recette). 17 tableaux, toutes cellules en Paragraph, colWidths proportionnels, repeatRows=1, hAlign CENTER.
+- Numbering plan (Step 3.5): cover/TOC non numérotés, chapitres 1-8 + annexes A/B. Pagination: TOC en romain (i, ii), corps réinitialisé à 1 — implémenté via beforeDocument/afterFlowable + build en deux passages (CDC_FIXED_F découvert puis figé) car la normalisation des numéros masquait la convergence de multiBuild.
+- Cover: Template 01 HUD (fond clair, ligne d'ancrage verticale verte, kicker/hero/summary/meta) en HTML avec aliases cascade; corrigé écart texte↔ligne 32px→50px après cover_validate.js; validé par poster_validate.py check-html; rendu via html2poster.js --width 794px.
+- Merge pypdf avec normalisation A4 stricte (0.1pt), meta.brand, font.check (0 issue), pdf_qa.py --skip-cover: PASS intégral (20 pages). Correctifs en cours de route: retrait Noto Sans SC (fichier absent), bulletFontName FreeSerif (Helvetica interdite), placeholders '—' → 'Sans objet'.
+- Vérifications visuelles par rendu PNG (couverture, chapitre 1, page de tableaux): conformes.
+
+Stage Summary:
+- Livrables: download/cahier-des-charges-site-web-mycofert-burundi.pdf (20 pages A4, ~178 Ko, vectoriel, TOC cliquable) + download/cahier-des-charges-couverture.html (source HTML de la couverture, réutilisable).
+- Scripts persistés: scripts/cdc_body.py, scripts/cdc_cover.html, scripts/cdc_merge.py (éditables pour itérer).
+- Document conçu comme exemple pédagogique de cahier des charges: périmètre inclus/exclus explicites, exigences numérotées + MoSCoW, KPI mesurables, matrice de traçabilité, scénarios de recette.

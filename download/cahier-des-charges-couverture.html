@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800;900&display=swap" rel="stylesheet">
+<style>
+  @page { size: 794px 1123px; margin: 0; }
+  :root {
+    /* ── Cascade palette (design_engine palette-cascade, intent=nature, seed=42) ── */
+    --page-bg: #f4f5f5;
+    --section-bg: #f0f2f1;
+    --card-bg: #e8ebe9;
+    --table-stripe: #ebedec;
+    --header-fill: #324e40;
+    --cover-block: #567465;
+    --border: #acc5b9;
+    --icon: #4ba478;
+    --accent: #1f9259;
+    --accent-secondary: #3ac2c2;
+    --text-primary: #131514;
+    --text-muted: #747e79;
+    /* ── Cover aliases ── */
+    --c-bg: #f4f5f5;
+    --c-accent: #1f9259;
+    --c-text: #131514;
+    --c-muted: #747e79;
+    --c-mid: #324e40;
+    --c-surface: #e8ebe9;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    width: 794px; height: 1123px;
+    background: var(--c-bg);
+    font-family: 'Inter', sans-serif;
+    color: var(--c-text);
+  }
+  @media screen {
+    html { height: auto; display: flex; justify-content: center; min-height: 100vh; background: var(--c-bg); }
+    body { transform-origin: top center; scale: min(1, calc(100vw / 794), calc(100vh / 1123)); margin: 0 auto; box-shadow: 0 0 60px rgba(0,0,0,0.18); }
+  }
+  .cover { width: 794px; height: 1123px; position: relative; box-sizing: border-box; }
+
+  /* Layer 1 — fond : grille discrète (2 % d'opacité) */
+  .grid-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(to right, rgba(50, 78, 64, 0.05) 0.5px, transparent 0.5px),
+      linear-gradient(to bottom, rgba(50, 78, 64, 0.05) 0.5px, transparent 0.5px);
+    background-size: 50px 50px;
+  }
+
+  /* Layer 2 — structure : ligne d'ancrage verticale épaisse */
+  .anchor-line {
+    position: absolute; z-index: 1;
+    left: 95px; top: 112px; bottom: 112px;
+    width: 8px;
+    background: var(--c-accent);
+  }
+
+  /* Layer 3 — contenu (tirants ancrés en pixels) */
+  .kicker {
+    position: absolute; z-index: 2;
+    left: 145px; top: 168px;
+    font-size: 16pt; font-weight: 400;
+    letter-spacing: 4px; text-transform: uppercase;
+    color: var(--c-accent); opacity: 0.75;
+    max-width: 560px;
+  }
+  .hero {
+    position: absolute; z-index: 2;
+    left: 145px; top: 337px;
+    font-size: 54pt; font-weight: 800; line-height: 1.15;
+    color: var(--c-text);
+    max-width: 580px;
+  }
+  .summary {
+    position: absolute; z-index: 2;
+    left: 145px; top: 561px;
+    font-size: 16.5pt; font-weight: 400; line-height: 1.6;
+    color: var(--c-muted);
+    max-width: 476px;
+  }
+  .meta {
+    position: absolute; z-index: 2;
+    left: 145px; top: 842px;
+    font-size: 16pt; font-weight: 400; line-height: 1.5;
+    color: var(--c-text);
+    max-width: 560px;
+  }
+  .meta .label { color: var(--c-muted); }
+  .meta .row { margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="cover">
+    <div class="grid-bg"></div>
+    <div class="anchor-line"></div>
+
+    <div class="kicker">Cahier des charges &middot; Version 1.0</div>
+
+    <div class="hero">MYCOFERT<br>BURUNDI</div>
+
+    <div class="summary">
+      Site web institutionnel bilingue (fran&ccedil;ais / anglais) destin&eacute; &agrave; la
+      g&eacute;n&eacute;ration de demandes qualifi&eacute;es&nbsp;: catalogue des six gammes de
+      produits, formulaires de demande &agrave; cinq objets, espace &eacute;quipe de suivi et
+      mesure d&rsquo;audience interne.
+    </div>
+
+    <div class="meta">
+      <div class="row"><span class="label">Ma&icirc;tre d&rsquo;ouvrage&nbsp;:</span> MYCOFERT Burundi &mdash; Bujumbura</div>
+      <div class="row"><span class="label">R&eacute;daction&nbsp;:</span> Consultance web &mdash; Z.ai</div>
+      <div class="row"><span class="label">Date&nbsp;:</span> 19 octobre 2026</div>
+    </div>
+  </div>
+</body>
+</html>
