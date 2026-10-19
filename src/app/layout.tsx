@@ -14,24 +14,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: {
+    default: "MYCOFERT Burundi — Champignons frais et transformés + Engrais bio-organique",
+    template: "%s — MYCOFERT Burundi",
+  },
+  description:
+    "Producteur et transformateur de champignons, fournisseur de substrat et d'engrais bio-organiques, centre de formation en culture de champignons à Bujumbura, Burundi. Mushroom producer, substrate and bio-organic fertilizer supplier, and training provider.",
+  keywords: [
+    "MYCOFERT Burundi",
+    "champignons Burundi",
+    "mushrooms Burundi",
+    "engrais bio-organique",
+    "bio-organic fertilizer",
+    "substrat de champignons",
+    "mushroom substrate",
+    "formation culture de champignons",
+    "mushroom farming training",
+    "Bujumbura",
+  ],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "MYCOFERT Burundi",
+    description:
+      "Champignons frais et transformés + engrais bio-organique. Des sols fertiles, des cultures productives.",
+    siteName: "MYCOFERT Burundi",
     type: "website",
+    locale: "fr_BI",
+    alternateLocale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "MYCOFERT Burundi",
+    description: "Champignons frais et transformés + engrais bio-organique — Bujumbura, Burundi.",
   },
 };
 
@@ -41,7 +57,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
