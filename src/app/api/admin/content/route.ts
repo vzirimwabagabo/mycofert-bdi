@@ -1,26 +1,39 @@
 // Admin content management API — create / update / delete products and news,
-// and save editable site settings. Protected by the same admin token as
-// /api/admin/data (passcode -> base64 token via /api/admin/auth).
+// and save editable site settings. Protected by signed admin tokens minted by
+// /api/admin/auth.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { getAdminContent, newsDto, productDto } from '@/lib/cms-server';
-import { SETTING_KEYS, slugify } from '@/lib/cms-defaults';
+import { IMAGE_LIBRARY, SETTING_KEYS, slugify } from '@/lib/cms-defaults';
+import { ADMIN_TOKEN_HEADER, verifyRequest } from '@/lib/auth';
+import { LIMIT_ADMIN_API, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
 
-const PASSCODE = process.env.ADMIN_PASSCODE || 'mycofert2026';
-
-function isValidToken(token: string | null): boolean {
-  if (!token) return false;
-  try {
-    return Buffer.from(token, 'base64').toString('utf8') === PASSCODE;
-  } catch {
-    return false;
+/**
+ * Authorise an admin request, with rate limiting.
+ * Returns a NextResponse to send on failure, or null when the caller may proceed.
+ */
+async function authorize(req: NextRequest): Promise<NextResponse | null> {
+  const limit = await rateLimitRequest(req, LIMIT_ADMIN_API);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: rateLimitHeaders(limit) }
+    );
   }
-}
 
-function unauthorized() {
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const result = verifyRequest(req.headers.get(ADMIN_TOKEN_HEADER));
+  if (!result.ok) {
+    if (result.reason === 'not-configured') {
+      return NextResponse.json({ error: 'Admin authentication is not configured' }, { status: 503 });
+    }
+    return NextResponse.json(
+      { error: result.reason === 'expired' ? 'Session expired' : 'Unauthorized' },
+      { status: 401, headers: result.reason === 'expired' ? { 'X-Session-Expired': '1' } : undefined }
+    );
+  }
+  return null;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -33,6 +46,16 @@ function str(v: unknown, max: number): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
 }
 
+/**
+ * imageKey maps to a file under /public/images, so only library members are
+ * accepted. An arbitrary value would silently fall back to 'fresh' at render
+ * time while being stored verbatim, so reject it at the boundary instead.
+ */
+function imageKey(v: unknown, fallback: string): string {
+  const candidate = str(v, 40);
+  return (IMAGE_LIBRARY as readonly string[]).includes(candidate) ? candidate : fallback;
+}
+
 /** Build a Prisma update payload from a partial product form object. */
 function productUpdateData(d: Record<string, unknown>): Prisma.ProductUpdateInput {
   const data: Prisma.ProductUpdateInput = {};
@@ -42,8 +65,8 @@ function productUpdateData(d: Record<string, unknown>): Prisma.ProductUpdateInpu
     data.sortOrder = Math.trunc(d.sortOrder);
   }
   if (typeof d.published === 'boolean') data.published = d.published;
-  const imageKey = str(d.imageKey, 40);
-  if (imageKey) data.imageKey = imageKey;
+  const key = str(d.imageKey, 40);
+  if (key && (IMAGE_LIBRARY as readonly string[]).includes(key)) data.imageKey = key;
   const nameFr = str(d.nameFr, 200);
   if (nameFr) {
     data.nameFr = nameFr;
@@ -68,8 +91,8 @@ function newsUpdateData(d: Record<string, unknown>): Prisma.NewsPostUpdateInput 
   const slug = slugify(str(d.slug, 60));
   if (slug) data.slug = slug;
   if (typeof d.published === 'boolean') data.published = d.published;
-  const imageKey = str(d.imageKey, 40);
-  if (imageKey) data.imageKey = imageKey;
+  const key = str(d.imageKey, 40);
+  if (key && (IMAGE_LIBRARY as readonly string[]).includes(key)) data.imageKey = key;
   if (typeof d.dateFr === 'string') data.dateFr = str(d.dateFr, 60);
   if (typeof d.dateEn === 'string') data.dateEn = str(d.dateEn, 60);
   const titleFr = str(d.titleFr, 200);
@@ -89,7 +112,8 @@ function newsUpdateData(d: Record<string, unknown>): Prisma.NewsPostUpdateInput 
 // --- handlers ---------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
-  if (!isValidToken(req.headers.get('x-admin-token'))) return unauthorized();
+  const denied = await authorize(req);
+  if (denied) return denied;
   try {
     const content = await getAdminContent();
     return NextResponse.json(content, { headers: { 'Cache-Control': 'no-store' } });
@@ -100,7 +124,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isValidToken(req.headers.get('x-admin-token'))) return unauthorized();
+  const denied = await authorize(req);
+  if (denied) return denied;
   try {
     const body = await req.json();
     const kind = body.kind;
@@ -121,7 +146,7 @@ export async function POST(req: NextRequest) {
           sortOrder:
             typeof d.sortOrder === 'number' && Number.isFinite(d.sortOrder) ? Math.trunc(d.sortOrder) : 0,
           published: d.published !== false,
-          imageKey: str(d.imageKey, 40) || 'fresh',
+          imageKey: imageKey(d.imageKey, 'fresh'),
           nameFr,
           nameEn: str(d.nameEn, 200) || nameFr,
           taglineFr: str(d.taglineFr, 300),
@@ -150,7 +175,7 @@ export async function POST(req: NextRequest) {
         data: {
           slug,
           published: d.published !== false,
-          imageKey: str(d.imageKey, 40) || 'training',
+          imageKey: imageKey(d.imageKey, 'training'),
           dateFr: str(d.dateFr, 60),
           dateEn: str(d.dateEn, 60),
           titleFr,
@@ -178,7 +203,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  if (!isValidToken(req.headers.get('x-admin-token'))) return unauthorized();
+  const denied = await authorize(req);
+  if (denied) return denied;
   try {
     const body = await req.json();
     const kind = body.kind;
@@ -225,7 +251,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  if (!isValidToken(req.headers.get('x-admin-token'))) return unauthorized();
+  const denied = await authorize(req);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(req.url);
     const kind = searchParams.get('kind');

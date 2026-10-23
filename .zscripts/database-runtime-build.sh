@@ -2,32 +2,46 @@
 
 set -euo pipefail
 
+# Verify that the production database is reachable and its schema is applied.
+#
+# This script used to COPY db/custom.db from the working tree into the build
+# artifact. That is wrong in two ways:
+#   1. It baked whatever inquiries happened to be in the developer's local
+#      SQLite file into every deployment package — a data leak.
+#   2. It created a per-build copy of the database, so two deployments could
+#      serve different data.
+#
+# The database now lives in PostgreSQL, is migrated explicitly, and is not
+# part of the build output at all.
+
 PROJECT_DIR="${PROJECT_DIR:-/home/z/my-project}"
-BUILD_DIR="${BUILD_DIR:?BUILD_DIR is required}"
-SOURCE_DB_DIR="$PROJECT_DIR/db"
-SOURCE_DB_PATH="$SOURCE_DB_DIR/custom.db"
-TARGET_DB_DIR="$BUILD_DIR/db"
-TARGET_DB_PATH="$TARGET_DB_DIR/custom.db"
 
-mkdir -p "$TARGET_DB_DIR"
-
-if [ -f "$SOURCE_DB_PATH" ]; then
-    echo "🗄️  复制 Preview 数据库到构建产物..."
-    cp -a "$SOURCE_DB_DIR/." "$TARGET_DB_DIR/"
-else
-    echo "ℹ️  未找到 Preview 数据库 db/custom.db，将初始化空的生产数据库"
-fi
-
-echo "🗄️  同步构建产物中的数据库结构..."
-(
-    cd "$PROJECT_DIR"
-    DATABASE_URL="file:$TARGET_DB_PATH" bun run db:push
-)
-
-if [ ! -f "$TARGET_DB_PATH" ]; then
-    echo "❌ 数据库初始化命令执行成功，但未生成 $TARGET_DB_PATH"
+if [ -z "${DATABASE_URL:-}" ]; then
+    echo "❌ DATABASE_URL is not set."
+    echo "   Set it to the PostgreSQL connection string for this environment."
     exit 1
 fi
 
-echo "✅ 构建产物数据库已准备完成"
-ls -lah "$TARGET_DB_DIR"
+if [[ "$DATABASE_URL" == file:* ]]; then
+    echo "❌ DATABASE_URL points at a SQLite file ($DATABASE_URL)."
+    echo "   This app runs on multiple instances behind a load balancer and"
+    echo "   requires PostgreSQL. Update the deployment configuration."
+    exit 1
+fi
+
+echo "🗄️  Applying database migrations..."
+(
+    cd "$PROJECT_DIR"
+    # `migrate deploy` applies committed migrations and never generates or
+    # drops anything. Deliberately not `db push --accept-data-loss`, which can
+    # silently destroy production data when the schema drifts.
+    bunx prisma migrate deploy
+)
+
+echo "🔎 Verifying database connectivity..."
+(
+    cd "$PROJECT_DIR"
+    bunx prisma migrate status
+)
+
+echo "✅ Database is migrated and reachable."

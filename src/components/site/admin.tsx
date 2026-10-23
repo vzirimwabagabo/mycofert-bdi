@@ -23,6 +23,7 @@ export function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
   const [passcode, setPasscode] = useState('');
   const [authError, setAuthError] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [content, setContent] = useState<AdminContent | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -31,18 +32,42 @@ export function AdminPage() {
     if (stored) setToken(stored);
   }, []);
 
-  const loadContent = useCallback(async (tok: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/content', { headers: { 'x-admin-token': tok } });
-      if (!res.ok) throw new Error(String(res.status));
-      setContent(await res.json());
-    } catch {
-      setContent(null);
-    } finally {
-      setLoading(false);
-    }
+  /**
+   * Central reaction to an API response.
+   * An expired token is indistinguishable from a wrong one to the server, so
+   * the X-Session-Expired header (set by our routes) is what lets us log the
+   * user out cleanly instead of showing a generic error forever.
+   */
+  const handleUnauthorized = useCallback((res: Response) => {
+    if (res.status !== 401 && res.status !== 503) return false;
+    window.sessionStorage.removeItem('mycofert-admin-token');
+    setToken(null);
+    setContent(null);
+    setAuthError(false);
+    setAuthNotice(
+      res.status === 503
+        ? 'Admin authentication is not configured on the server.'
+        : 'Your session has expired. Please sign in again.'
+    );
+    return true;
   }, []);
+
+  const loadContent = useCallback(
+    async (tok: string) => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/content', { headers: { 'x-admin-token': tok } });
+        if (handleUnauthorized(res)) return;
+        if (!res.ok) throw new Error(String(res.status));
+        setContent(await res.json());
+      } catch {
+        setContent(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [handleUnauthorized]
+  );
 
   useEffect(() => {
     if (token) loadContent(token);
@@ -51,16 +76,26 @@ export function AdminPage() {
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setAuthError(false);
-    const res = await fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passcode }),
-    });
-    if (res.ok) {
-      const { token: tok } = await res.json();
-      window.sessionStorage.setItem('mycofert-admin-token', tok);
-      setToken(tok);
-    } else {
+    setAuthNotice(null);
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode }),
+      });
+      if (res.ok) {
+        const { token: tok } = await res.json();
+        window.sessionStorage.setItem('mycofert-admin-token', tok);
+        setToken(tok);
+        setPasscode('');
+      } else if (res.status === 503) {
+        setAuthNotice('Admin authentication is not configured on the server.');
+      } else if (res.status === 429) {
+        setAuthNotice('Too many attempts. Please wait and try again.');
+      } else {
+        setAuthError(true);
+      }
+    } catch {
       setAuthError(true);
     }
   }
@@ -69,6 +104,7 @@ export function AdminPage() {
     window.sessionStorage.removeItem('mycofert-admin-token');
     setToken(null);
     setContent(null);
+    setPasscode('');
   }
 
   const reload = useCallback(async () => {
@@ -96,6 +132,7 @@ export function AdminPage() {
                 required
               />
               {authError ? <p className="text-xs text-destructive">{t.admin.wrongPasscode}</p> : null}
+              {authNotice ? <p className="text-xs text-destructive">{authNotice}</p> : null}
             </div>
             <Button type="submit" className="w-full bg-[#2F6B3F] text-white hover:bg-[#275A34]">
               {t.admin.login}

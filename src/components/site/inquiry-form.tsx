@@ -42,6 +42,8 @@ export function InquiryForm({
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [phoneError, setPhoneError] = useState(false);
+  // Honeypot: hidden from humans via CSS, filled in by naive bots.
+  const [website, setWebsite] = useState('');
 
   const productOptions = useMemo(
     () => products.map((p) => ({ id: p.slug, name: pick(p.name, lang) })),
@@ -69,6 +71,7 @@ export function InquiryForm({
           product: product !== 'none' ? product : null,
           message: message.trim(),
           lang,
+          website,
         }),
       });
       if (!res.ok) throw new Error('request failed');
@@ -78,6 +81,7 @@ export function InquiryForm({
       setEmail('');
       setProduct('none');
       setMessage('');
+      setWebsite('');
     } catch {
       toast({
         title: t.form.errorTitle,
@@ -91,6 +95,19 @@ export function InquiryForm({
 
   return (
     <form onSubmit={handleSubmit} className={compact ? 'space-y-4' : 'grid gap-4 sm:grid-cols-2'}>
+      {/* Honeypot — hidden from users and assistive tech, tempting to bots. */}
+      <div aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+        <label htmlFor="inq-website">Website</label>
+        <input
+          id="inq-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
       <div className="space-y-2">
         <Label htmlFor="inq-name">{t.form.name} *</Label>
         <Input

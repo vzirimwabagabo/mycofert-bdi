@@ -52,3 +52,17 @@ prompt
 server.log
 # Skills directory
 /skills/
+# local database files - never commit data, and never ship the dev copy in a build
+/db
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# runtime-generated content
+/download
+/upload
+
+# local tooling output
+/tool-results
+/examples

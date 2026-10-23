@@ -1,27 +1,23 @@
-// Prisma schema for MYCOFERT Burundi website
+// Prisma schema for MYCOFERT Burundi.
 //
-// Database providers:
-//   - Local sandbox / development : SQLite (current)
-//   - Production (Supabase)       : PostgreSQL
+// Provider is PostgreSQL: the app runs behind a load balancer on multiple
+// app instances, and SQLite is a single-file, single-writer database that
+// cannot be shared between them.
 //
-// To switch to Supabase, change the provider below to "postgresql" and point
-// DATABASE_URL at the Supabase connection string, then run `bun run db:push`.
-// The models below only use portable scalar types (String / Int / Boolean /
-// DateTime), so the same schema works on both providers unchanged.
+// Indexes below are chosen for the actual query patterns:
+//   * Inquiry  — dashboard listing sorted by createdAt desc, filtered by
+//                status and grouped by type.
+//   * PageView — grouped by path, counted in bulk, written on every navigation.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
-  // provider = "postgresql"  // <- enable this line for Supabase and disable "sqlite"
 }
 
-// Inquiries submitted from the website forms.
-// type: "product" (product information) | "bulk" (bulk supply) | "fertilizer"
-//     | "training" | "partnership"
 model Inquiry {
   id        String   @id @default(cuid())
   name      String
@@ -33,52 +29,52 @@ model Inquiry {
   lang      String   @default("fr")
   status    String   @default("new")
   createdAt DateTime @default(now())
+
+  // Dashboard default view: newest first.
+  @@index([createdAt(sort: Desc)])
+  // Status filter ("new" badge count, handled toggle).
+  @@index([status])
+  // "By subject" breakdown.
+  @@index([type])
+  // Composite for the common "filter by status, newest first" listing.
+  @@index([status, createdAt(sort: Desc)])
 }
 
-// Lightweight first-party page analytics.
 model PageView {
   id        String   @id @default(cuid())
   path      String
   lang      String   @default("fr")
   createdAt DateTime @default(now())
+
+  // Top-pages aggregation and path grouping.
+  @@index([path])
+  // Retention / time-window queries.
+  @@index([createdAt])
 }
 
-// ---------------------------------------------------------------------------
-// Content management (edited by the owner from the admin dashboard)
-// ---------------------------------------------------------------------------
-
-// Key/value store for editable site texts and contact details.
-// Keys: "contact" | "home" | "training" | "about" | "sustainability" | "seeded"
-// value is a JSON string; bilingual fields are stored as { "fr": "...", "en": "..." }.
-model SiteSetting {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
-}
-
-// Products displayed on the site (fresh mushrooms, dried, powder, ...).
-// Points and formats are free text; points use one item per line.
 model Product {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  sortOrder   Int      @default(0)
-  published   Boolean  @default(true)
-  imageKey    String   @default("fresh")
-  nameFr      String
-  nameEn      String
-  taglineFr   String   @default("")
-  taglineEn   String   @default("")
-  descFr      String   @default("")
-  descEn      String   @default("")
-  pointsFr    String   @default("")
-  pointsEn    String   @default("")
-  formatsFr   String   @default("")
-  formatsEn   String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  sortOrder Int      @default(0)
+  published Boolean  @default(true)
+  imageKey  String   @default("fresh")
+  nameFr    String
+  nameEn    String
+  taglineFr String   @default("")
+  taglineEn String   @default("")
+  descFr    String   @default("")
+  descEn    String   @default("")
+  pointsFr  String   @default("")
+  pointsEn  String   @default("")
+  formatsFr String   @default("")
+  formatsEn String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Public listing: published only, ordered by sortOrder then nameFr.
+  @@index([published, sortOrder])
 }
 
-// News / blog articles. Body paragraphs are separated by a blank line.
 model NewsPost {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -93,5 +89,14 @@ model NewsPost {
   bodyFr    String   @default("")
   bodyEn    String   @default("")
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Public listing: published only, newest first.
+  @@index([published, createdAt(sort: Desc)])
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String
   updatedAt DateTime @updatedAt
 }
