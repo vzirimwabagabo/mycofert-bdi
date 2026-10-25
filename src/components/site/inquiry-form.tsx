@@ -37,7 +37,13 @@ export function InquiryForm({
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [type, setType] = useState<InquiryType>(defaultType);
+  const [type, setType] = useState<InquiryType>(() => {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('type');
+      if (q && (TYPES as string[]).includes(q)) return q as InquiryType;
+    }
+    return defaultType;
+  });
   const [product, setProduct] = useState<string>(defaultProduct ?? 'none');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);

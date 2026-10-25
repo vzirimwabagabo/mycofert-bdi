@@ -51,7 +51,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const t = getDict(route.lang);
   const navKey =
     route.page === 'news-post' ? 'news' : PAGE_TITLE_KEY[route.page as Exclude<PageId, 'news-post' | 'admin'>];
-  const title = route.page === 'home' ? t.meta.title : `${t.nav[navKey as keyof typeof t.nav]}`;
+  // Base title; overridden with the article's own title below for news-post.
+  let title: string = route.page === 'home' ? t.meta.title : `${t.nav[navKey as keyof typeof t.nav]}`;
 
   const alternates: Record<string, string> = {};
   for (const l of ['fr', 'en'] as const) {
@@ -66,6 +67,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     try {
       const post = (await getContent()).news.find((n) => n.slug === route.slug);
       if (post) {
+        // Use the article's own title so each news page has a distinct <title>
+        // and og:title instead of the generic "News" section label.
+        const postTitle = post.title[route.lang] || post.title['fr'] || post.title['en'];
+        if (postTitle) title = postTitle;
         description = post.excerpt[route.lang] || description;
         other['article:published_time'] = post.createdAt;
       }

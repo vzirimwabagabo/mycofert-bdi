@@ -10,6 +10,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+/** Maximum allowed body size for incoming API requests (2 MB). Direct uploads bypass this proxy. */
+const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
+
 /**
  * Reduce a configured URL to its `scheme://host` origin, for a CSP source list.
  * A CSP entry is an origin, never a path, so the bucket's `/storage/v1/...`
@@ -26,6 +29,18 @@ function originOf(value: string | undefined): string {
 }
 
 export function proxy(request: NextRequest) {
+  // Reject oversized payloads early at the proxy boundary before parsing JSON.
+  const contentLength = request.headers.get('content-length');
+  if (contentLength) {
+    const bytes = Number.parseInt(contentLength, 10);
+    if (Number.isFinite(bytes) && bytes > MAX_REQUEST_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Payload too large. Maximum request size is 2 MB.' },
+        { status: 413 }
+      );
+    }
+  }
+
   // 16 random bytes → 22-char base64url nonce
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64');
 

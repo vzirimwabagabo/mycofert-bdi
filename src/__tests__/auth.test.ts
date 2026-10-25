@@ -89,6 +89,7 @@ describe('auth', () => {
       expect(verified.ok).toBe(true);
       if (verified.ok) {
         expect(verified.payload.sub).toBe('admin');
+        expect(typeof verified.payload.sv).toBe('number');
       }
     });
 

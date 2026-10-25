@@ -79,7 +79,7 @@ function PanelFallback({
 
 export function AdminPage() {
   const { t, lang, navigate } = useSite();
-  const { tab: tourTab } = useTour();
+  const { tab: tourTab, start: startTour } = useTour();
   const [mounted, setMounted] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [passcode, setPasscode] = useState('');
@@ -111,6 +111,23 @@ export function AdminPage() {
   useEffect(() => {
     if (tourTab) setActiveTab(tourTab);
   }, [tourTab]);
+
+  // Auto-start admin tour once the passcode is entered and user is let in (first-time only)
+  useEffect(() => {
+    if (!token) return;
+    try {
+      const seen = window.localStorage.getItem('mycofert_admin_tour_seen');
+      if (!seen) {
+        window.localStorage.setItem('mycofert_admin_tour_seen', '1');
+        const timer = setTimeout(() => {
+          startTour('admin');
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+  }, [token, startTour]);
 
   /**
    * Central reaction to an API response.

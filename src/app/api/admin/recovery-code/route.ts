@@ -7,7 +7,7 @@
 // The plaintext is returned exactly once, here. Only its scrypt hash is stored.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { ADMIN_TOKEN_HEADER, issueRecoveryCode, verifyPasscode, verifyRequest } from '@/lib/auth';
+import { ADMIN_TOKEN_HEADER, issueRecoveryCode, verifyPasscode, verifyRequestAsync } from '@/lib/auth';
 import { LIMIT_ADMIN_API, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -21,11 +21,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const auth = verifyRequest(req.headers.get(ADMIN_TOKEN_HEADER));
+  const auth = await verifyRequestAsync(req.headers.get(ADMIN_TOKEN_HEADER));
   if (!auth.ok) {
     return NextResponse.json(
-      { error: auth.reason === 'expired' ? 'Session expired' : 'Unauthorized' },
-      { status: 401, headers: auth.reason === 'expired' ? { 'X-Session-Expired': '1' } : undefined }
+      { error: auth.reason === 'revoked' ? 'Session revoked — please sign in again' : auth.reason === 'expired' ? 'Session expired' : 'Unauthorized' },
+      { status: 401, headers: auth.reason === 'expired' ? { 'X-Session-Expired': '1' } : auth.reason === 'revoked' ? { 'X-Session-Revoked': '1' } : undefined }
     );
   }
 

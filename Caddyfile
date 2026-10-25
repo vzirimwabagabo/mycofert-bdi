@@ -7,16 +7,66 @@
 # TLS: Caddy auto-obtains a certificate via ACME. Replace the hostname
 # below with your real domain in production.
 #
+# Multi-instance setup
+# --------------------
+# To run N replicas behind this proxy, list each upstream address in the
+# reverse_proxy block below. Caddy will round-robin between them and
+# automatically remove unhealthy instances when they stop responding.
+#
+# Example (3 replicas on the same host, different ports):
+#   reverse_proxy localhost:3000 localhost:3001 localhost:3002 {
+#     health_uri        /api/health
+#     health_interval   10s
+#     health_timeout    3s
+#     health_status     200
+#     ...
+#   }
+#
+# For container / k8s deployments, replace the address list with the
+# service DNS name (e.g. "app:3000") or use a load_balance policy:
+#   lb_policy round_robin     # default
+#   lb_policy least_conn      # route to instance with fewest active requests
+#   lb_policy ip_hash         # sticky sessions by client IP (not recommended
+#                             # unless session state is NOT stored in Redis)
+#
+# Health probes
+# -------------
+# Use /api/health      for liveness (cheap — no DB check).
+# Use /api/health?deep=1 for readiness (one SELECT 1 — pulls broken instances
+# out of rotation without restarting them).
+#
 # In the z.ai sandbox the site still listens on :80 without a hostname
 # so the health-check proxy path works; strip the {$DOMAIN} block for
 # that environment.
 
 {$DOMAIN:localhost} {
-	# Forward all traffic to the Next.js process.
-	reverse_proxy localhost:3000 {
+	# Limit request body size at the proxy boundary (2 MB).
+	# Image uploads go directly from client to S3/Cloudinary and bypass this proxy.
+	request_body {
+		max_size 2MB
+	}
+
+	# Forward all traffic to the Next.js process(es).
+	# To scale, add more upstream addresses here or replace with a DNS name.
+	reverse_proxy {$APP_UPSTREAM:localhost:3000} {
+		# Overwrite forwarding headers from the socket address so the app
+		# can trust X-Forwarded-For for rate-limit identity (TRUST_PROXY=1).
 		header_up Host {host}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Real-IP {remote_host}
+
+		# Active health checking — unhealthy upstreams are removed from
+		# rotation until they recover. Liveness probe only: a DB blip must
+		# not pull a healthy instance.
+		health_uri     /api/health
+		health_interval 10s
+		health_timeout  3s
+		health_status   200
+
+		# Limit the response body Caddy buffers so a slow upstream cannot
+		# exhaust proxy memory. Adjust if you serve large file downloads.
+		response_header_timeout 30s
+		dial_timeout            5s
 	}
 }

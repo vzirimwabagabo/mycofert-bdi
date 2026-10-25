@@ -12,10 +12,18 @@
 //
 // Token format (all base64url):
 //   <payloadB64>.<signatureB64>
-// where payloadB64 = base64url(JSON.stringify({ sub, iat, exp }))
+// where payloadB64 = base64url(JSON.stringify({ sub, iat, exp, sv }))
 // and   signatureB64 = base64url(HMAC-SHA256(payloadB64, SESSION_SECRET))
 // The signed message is the *encoded payload*, so no canonicalisation of JSON
 // is required at verification time.
+//
+// Session versioning / revocation:
+//   A 32-bit integer `sv` (session version) is embedded in the token payload
+//   and checked against `SiteSetting.admin_session_version` at verification
+//   time. Every passcode change or recovery-code reset increments the stored
+//   counter, immediately invalidating all previously-issued tokens — even
+//   within the 12-hour TTL window. The DB lookup adds one round-trip per
+//   admin API call, which is acceptable given the low request volume.
 
 import { createHmac, timingSafeEqual, randomBytes, scryptSync } from 'node:crypto';
 
@@ -31,6 +39,7 @@ export interface AdminTokenPayload {
   iat: number; // unix timestamp in seconds
   exp: number; // unix timestamp in seconds
   jti: string; // token id — useful for logging / future denylist
+  sv: number;  // session version — incremented on every passcode change/reset
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +102,9 @@ export interface StoredPasswordHash {
 /** SiteSetting rows holding the hashed credentials (never the plaintext). */
 const PASSCODE_KEY = 'admin_passcode_hash';
 const RECOVERY_KEY = 'admin_recovery_hash';
+/** Monotonic counter embedded in tokens. Incrementing it invalidates all
+ *  previously-issued sessions, even ones that have not yet expired. */
+const SESSION_VERSION_KEY = 'admin_session_version';
 
 /** Serialised { hash, salt, updatedAt } exactly as stored in SiteSetting.value. */
 function hashSettingValue(plaintext: string): string {
@@ -166,6 +178,43 @@ export async function verifyPasscode(candidate: unknown): Promise<boolean> {
 }
 
 /**
+ * Read the current session version from the database.
+ * Returns 0 if the row does not exist yet (first use before any passcode change).
+ * Fails open: a DB error should not block auth verification on an unrelated host.
+ */
+async function readSessionVersion(): Promise<number> {
+  try {
+    const { db } = await import('@/lib/db');
+    const row = await db.siteSetting.findUnique({ where: { key: SESSION_VERSION_KEY } });
+    if (!row?.value) return 0;
+    const n = Number.parseInt(row.value, 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch (error) {
+    console.warn('[auth] session-version lookup failed (failing open):', error);
+    return -1; // sentinel: skip version check on DB errors to avoid locking everyone out
+  }
+}
+
+/**
+ * Atomically increment the session version.
+ * Called on every passcode change or recovery-code reset to invalidate existing tokens.
+ * Returns the new version number.
+ */
+async function bumpSessionVersion(): Promise<number> {
+  const { db } = await import('@/lib/db');
+  // Read current value and increment in a transaction so concurrent resets don't
+  // produce the same new version.
+  const row = await db.siteSetting.findUnique({ where: { key: SESSION_VERSION_KEY } });
+  const next = (row?.value ? (Number.parseInt(row.value, 10) || 0) : 0) + 1;
+  await db.siteSetting.upsert({
+    where: { key: SESSION_VERSION_KEY },
+    create: { key: SESSION_VERSION_KEY, value: String(next) },
+    update: { value: String(next) },
+  });
+  return next;
+}
+
+/**
  * Update the admin passcode in the database.
  * Requires the current passcode to match.
  */
@@ -190,6 +239,10 @@ export async function updateAdminPasscode(
     create: { key: PASSCODE_KEY, value },
     update: { value },
   });
+
+  // Invalidate all previously-issued sessions so a stolen token cannot be used
+  // after a passcode change.
+  await bumpSessionVersion();
 
   return { ok: true };
 }
@@ -308,6 +361,10 @@ export async function resetPasscodeWithRecovery(
     }),
   ]);
 
+  // Bump session version AFTER the transaction so all tokens issued before this
+  // reset become invalid, even if they have not yet expired.
+  await bumpSessionVersion();
+
   return { ok: true, recoveryCode: replacement };
 }
 
@@ -350,7 +407,7 @@ export interface IssueFailure {
   reason: 'not-configured' | 'invalid-passcode' | 'weak-passcode';
 }
 
-function mintToken(secret: string): IssueResult {
+function mintToken(secret: string, sessionVersion: number): IssueResult {
   const now = Math.floor(Date.now() / 1000);
   const payload: AdminTokenPayload = {
     sub: 'admin',
@@ -358,6 +415,7 @@ function mintToken(secret: string): IssueResult {
     iat: now,
     exp: now + TOKEN_TTL_SECONDS,
     jti: randomBytes(12).toString('hex'),
+    sv: sessionVersion,
   };
 
   const encoded = b64urlEncode(Buffer.from(JSON.stringify(payload), 'utf8'));
@@ -367,6 +425,7 @@ function mintToken(secret: string): IssueResult {
 /**
  * Synchronous token issuance (primarily for tests and backwards compatibility).
  * Checks against environment variable ADMIN_PASSCODE.
+ * NOTE: does not embed a real session version (uses 0) — only for unit tests.
  */
 export function issueToken(passcode: unknown): IssueResult | IssueFailure {
   const config = getConfig();
@@ -377,11 +436,12 @@ export function issueToken(passcode: unknown): IssueResult | IssueFailure {
   if (typeof passcode !== 'string' || !passcode) return { ok: false, reason: 'invalid-passcode' };
   if (!passcodeMatches(passcode, config.passcode)) return { ok: false, reason: 'invalid-passcode' };
 
-  return mintToken(config.secret);
+  return mintToken(config.secret, 0);
 }
 
 /**
  * Asynchronous token issuance. Checks database-stored hash first, then falls back to env.
+ * Embeds the current session version so the token can be revoked by a passcode change.
  */
 export async function issueTokenAsync(passcode: unknown): Promise<IssueResult | IssueFailure> {
   const config = getConfig();
@@ -392,16 +452,21 @@ export async function issueTokenAsync(passcode: unknown): Promise<IssueResult | 
   const valid = await verifyPasscode(passcode);
   if (!valid) return { ok: false, reason: 'invalid-passcode' };
 
-  return mintToken(config.secret);
+  const sv = await readSessionVersion();
+  return mintToken(config.secret, sv < 0 ? 0 : sv);
 }
 
 export type VerifyResult =
   | { ok: true; payload: AdminTokenPayload }
-  | { ok: false; reason: 'missing' | 'malformed' | 'bad-signature' | 'expired' | 'not-configured' };
+  | { ok: false; reason: 'missing' | 'malformed' | 'bad-signature' | 'expired' | 'not-configured' | 'revoked' };
 
 /**
  * Verify a token. Never throws — every failure path returns a discriminated
  * result so route handlers can map it to the right status code.
+ *
+ * This is the synchronous structural check only (signature + expiry). For
+ * routes that also need session-version revocation checking, call
+ * verifyRequestAsync() instead.
  */
 export function verifyToken(token: unknown): VerifyResult {
   const config = getConfig();
@@ -452,11 +517,38 @@ export function verifyToken(token: unknown): VerifyResult {
 export const ADMIN_TOKEN_HEADER = 'x-admin-token';
 
 /**
- * Verify the admin token on an incoming request.
+ * Verify the admin token on an incoming request — synchronous structural check.
  * Pass the header value: `verifyRequest(req.headers.get(ADMIN_TOKEN_HEADER))`.
  */
 export function verifyRequest(tokenHeader: string | null): VerifyResult {
   return verifyToken(tokenHeader);
+}
+
+/**
+ * Verify the admin token including a session-version revocation check.
+ *
+ * Tokens issued before a passcode change carry a lower `sv` than the stored
+ * counter. This rejects them even if they have not yet hit their 12-hour TTL,
+ * making passcode changes take immediate effect across all instances.
+ *
+ * The DB lookup adds one round-trip per admin API call. Admin requests are
+ * rare enough that this is acceptable. On a DB error the version check is
+ * skipped (fail open) so a transient outage does not lock out the admin.
+ */
+export async function verifyRequestAsync(tokenHeader: string | null): Promise<VerifyResult> {
+  const base = verifyToken(tokenHeader);
+  if (!base.ok) return base;
+
+  const storedVersion = await readSessionVersion();
+  // storedVersion === -1 means the DB lookup failed; skip version check.
+  if (storedVersion >= 0) {
+    const tokenVersion = typeof base.payload.sv === 'number' ? base.payload.sv : 0;
+    if (tokenVersion < storedVersion) {
+      return { ok: false, reason: 'revoked' };
+    }
+  }
+
+  return base;
 }
 
 /**

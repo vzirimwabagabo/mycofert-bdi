@@ -1,11 +1,15 @@
-# Local development database.
+# Local development stack.
 #
 # The production database is PostgreSQL (Supabase free tier — see
 # docs/supabase-setup-guide.md). This compose file gives you the same engine
 # locally so migrations and seeds behave identically.
 #
-#   docker compose up -d     # start
-#   docker compose down      # stop (data persists in the mycofert_pgdata volume)
+# Redis is optional in development (the in-memory rate-limit store is correct
+# for a single instance), but is included here so you can validate the Redis
+# path locally before deploying.
+#
+#   docker compose up -d     # start both services
+#   docker compose down      # stop (data persists in named volumes)
 services:
   db:
     image: postgres:16-alpine
@@ -23,6 +27,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: mycofert-redis
+    # No persistence in dev — data is ephemeral. Add a volume if you want
+    # rate-limit counters to survive restarts locally.
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
 
 volumes:
   mycofert_pgdata:

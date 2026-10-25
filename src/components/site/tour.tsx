@@ -22,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -384,6 +385,79 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         />
       ) : null}
     </Ctx.Provider>
+  );
+}
+
+function subscribeToSession(callback: () => void) {
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
+
+function getSessionSnapshot(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.sessionStorage.getItem(TOKEN_KEY));
+}
+
+function getServerSnapshot(): boolean {
+  return false;
+}
+
+/** Header "Guide" button that opens tour options or starts public tour. */
+export function TourButton() {
+  const { t, route, navigate } = useSite();
+  const { start } = useTour();
+  const signedIn = useSyncExternalStore(subscribeToSession, getSessionSnapshot, getServerSnapshot);
+
+  const startAdmin = () => {
+    if (route.page !== 'admin') navigate('admin');
+    start('admin');
+  };
+
+  const startPublic = () => {
+    start('public');
+  };
+
+  if (signedIn) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            id="tour-header-trigger"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            aria-label={t.tour.launch}
+            suppressHydrationWarning
+          >
+            <Compass className="h-4 w-4 text-[#2F6B3F]" aria-hidden="true" />
+            <span className="hidden sm:inline font-medium">{t.tour.launch}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onClick={startPublic}>
+            {t.tour.menuPublic}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={startAdmin}>
+            {t.tour.menuAdmin}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  return (
+    <Button
+      id="tour-header-trigger"
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      onClick={startPublic}
+      aria-label={t.tour.launch}
+      suppressHydrationWarning
+    >
+      <Compass className="h-4 w-4 text-[#2F6B3F]" aria-hidden="true" />
+      <span className="hidden sm:inline font-medium">{t.tour.launch}</span>
+    </Button>
   );
 }
 

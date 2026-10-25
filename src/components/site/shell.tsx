@@ -5,6 +5,7 @@
 // and the server-fetched public content, so the first paint is complete,
 // crawlable HTML — navigation afterwards is client-side (no reloads).
 
+import { useEffect } from 'react';
 import { SiteProvider, useSite } from '@/components/site/context';
 import { CmsProvider, type PublicContent } from '@/components/site/cms';
 import { Header } from '@/components/site/header';
@@ -17,8 +18,32 @@ import { TrainingPage } from '@/components/site/training';
 import { NewsPage, NewsPostPage } from '@/components/site/news';
 import { ContactPage } from '@/components/site/contact';
 import { AdminPage } from '@/components/site/admin';
-import { TourProvider, TourLauncher } from '@/components/site/tour';
+import { TourProvider, useTour } from '@/components/site/tour';
 import type { Route } from '@/lib/route';
+
+function AutoPublicTour() {
+  const { route } = useSite();
+  const { start } = useTour();
+
+  useEffect(() => {
+    // Only auto-trigger public tour for regular visitors, not admin route
+    if (route.page === 'admin') return;
+    try {
+      const seen = window.localStorage.getItem('mycofert_public_tour_seen');
+      if (!seen) {
+        window.localStorage.setItem('mycofert_public_tour_seen', '1');
+        const timer = setTimeout(() => {
+          start('public');
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      // Ignore localStorage access issues
+    }
+  }, [route.page, start]);
+
+  return null;
+}
 
 function Router() {
   const { route } = useSite();
@@ -57,6 +82,7 @@ export function SiteShell({
         {/* Inside CmsProvider so tour steps can read the CMS content the page
             is showing, and inside SiteProvider so the overlay can navigate. */}
         <TourProvider>
+          <AutoPublicTour />
           <div className="flex min-h-screen flex-col">
             <Header />
             <main className="flex-1">
@@ -64,7 +90,6 @@ export function SiteShell({
             </main>
             <Footer />
             <WhatsAppFloat />
-            <TourLauncher />
           </div>
         </TourProvider>
       </CmsProvider>

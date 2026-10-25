@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useSite, hrefFor, type PageId } from './context';
 import { Logo, Wordmark } from './bits';
-import { Globe, Menu, Lock } from 'lucide-react';
+import { TourButton, useTour } from './tour';
+import { Compass, Globe, Menu, Lock } from 'lucide-react';
 import type { Lang } from '@/lib/i18n';
 
 const NAV: { page: PageId; key: 'home' | 'products' | 'about' | 'sustainability' | 'training' | 'news' | 'contact' }[] = [
@@ -33,6 +34,7 @@ const NAV: { page: PageId; key: 'home' | 'products' | 'about' | 'sustainability'
 
 export function Header() {
   const { t, lang, route, navigate, setLang } = useSite();
+  const { start: startTour } = useTour();
   const [open, setOpen] = useState(false);
 
   const go = (page: PageId) => {
@@ -72,6 +74,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <TourButton />
           <LangSwitch lang={lang} setLang={setLang} />
 
           <Button
@@ -116,9 +119,18 @@ export function Header() {
                 <button
                   onClick={() => {
                     setOpen(false);
+                    startTour('public');
+                  }}
+                  className="mt-2 flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-[#2F6B3F] hover:bg-secondary/70 font-medium"
+                >
+                  <Compass className="h-4 w-4 text-[#2F6B3F]" aria-hidden="true" /> {t.tour.launch}
+                </button>
+                <button
+                  onClick={() => {
+                    setOpen(false);
                     navigate('admin');
                   }}
-                  className="mt-2 flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-secondary/70"
+                  className="flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-secondary/70"
                 >
                   <Lock className="h-4 w-4" aria-hidden="true" /> {t.footer.adminLink}
                 </button>

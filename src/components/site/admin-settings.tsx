@@ -9,11 +9,41 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useSite } from './context';
-import { BiInput, BiTextarea, ImagePicker, LangChip, authHeaders, type AdminContent } from './admin-ui';
-import type { CmsSettings, IText } from '@/lib/cms-defaults';
-import { Mail, MapPin, MessageCircle, Home, GraduationCap, Recycle, Info, Plus, Trash2, Lock, KeyRound } from 'lucide-react';
+import { BiInput, BiTextarea, ImagePicker, LangChip, authHeaders, type AdminContent, type ImageValue } from './admin-ui';
+import {
+  resolveImage,
+  type CmsSettings,
+  type CmsTeamMember,
+  type CmsTeam,
+  type CmsPartner,
+  type CmsPartners,
+  type IText,
+} from '@/lib/cms-defaults';
+import {
+  Mail,
+  MapPin,
+  MessageCircle,
+  Home,
+  GraduationCap,
+  Recycle,
+  Info,
+  Plus,
+  Trash2,
+  Lock,
+  KeyRound,
+  Users,
+  Handshake,
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  Globe,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 
 async function saveSetting(token: string, key: string, value: unknown): Promise<boolean> {
   const res = await fetch('/api/admin/content', {
@@ -316,6 +346,637 @@ function SustainabilityGroup({ token, initial, reload }: GroupProps & { initial:
   );
 }
 
+// --- Team group -------------------------------------------------------------
+
+function TeamGroup({ token, initial, reload }: GroupProps & { initial: CmsSettings['team'] }) {
+  const { t, lang } = useSite();
+  const { toast } = useToast();
+  const [members, setMembers] = useState<CmsTeamMember[]>(initial?.members ? [...initial.members] : []);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formRole, setFormRole] = useState<IText>({ fr: '', en: '' });
+  const [formBio, setFormBio] = useState<IText>({ fr: '', en: '' });
+  const [formImage, setFormImage] = useState<ImageValue>({ imageKey: 'training', imageUrl: null });
+  const [formPublished, setFormPublished] = useState(true);
+
+  function openNew() {
+    setEditingIndex(null);
+    setFormName('');
+    setFormRole({ fr: '', en: '' });
+    setFormBio({ fr: '', en: '' });
+    setFormImage({ imageKey: 'training', imageUrl: null });
+    setFormPublished(true);
+    setDialogOpen(true);
+  }
+
+  function openEdit(index: number) {
+    const m = members[index];
+    if (!m) return;
+    setEditingIndex(index);
+    setFormName(m.name);
+    setFormRole({ fr: m.role.fr, en: m.role.en });
+    setFormBio(m.bio ? { fr: m.bio.fr, en: m.bio.en } : { fr: '', en: '' });
+    setFormImage({ imageKey: m.imageKey || 'training', imageUrl: m.imageUrl || null });
+    setFormPublished(m.published !== false);
+    setDialogOpen(true);
+  }
+
+  async function persist(updated: CmsTeamMember[]) {
+    setSaving(true);
+    const ok = await saveSetting(token, 'team', {
+      title: initial?.title || { fr: 'Notre Équipe', en: 'Our Team' },
+      subtitle: initial?.subtitle || {
+        fr: 'Des professionnels engagés pour une agriculture durable et prospère au Burundi.',
+        en: 'Passionate professionals committed to sustainable and prosperous agriculture in Burundi.',
+      },
+      members: updated,
+    });
+    setSaving(false);
+    if (ok) {
+      toast({ title: t.cms.saved });
+      await reload();
+    } else {
+      toast({ title: t.cms.errorSave, variant: 'destructive' });
+    }
+  }
+
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formName.trim() || !formRole.fr.trim()) return;
+
+    let updated: CmsTeamMember[];
+    if (editingIndex !== null) {
+      updated = [...members];
+      updated[editingIndex] = {
+        ...updated[editingIndex],
+        name: formName.trim(),
+        role: { fr: formRole.fr.trim(), en: formRole.en.trim() || formRole.fr.trim() },
+        bio: { fr: formBio.fr.trim(), en: formBio.en.trim() || formBio.fr.trim() },
+        imageUrl: formImage.imageUrl,
+        imageKey: formImage.imageKey,
+        published: formPublished,
+      };
+    } else {
+      const newMember: CmsTeamMember = {
+        id: `team-${Date.now()}`,
+        name: formName.trim(),
+        role: { fr: formRole.fr.trim(), en: formRole.en.trim() || formRole.fr.trim() },
+        bio: { fr: formBio.fr.trim(), en: formBio.en.trim() || formBio.fr.trim() },
+        imageUrl: formImage.imageUrl,
+        imageKey: formImage.imageKey,
+        sortOrder: members.length + 1,
+        published: formPublished,
+      };
+      updated = [...members, newMember];
+    }
+
+    setMembers(updated);
+    setDialogOpen(false);
+    await persist(updated);
+  }
+
+  async function deleteMember(index: number) {
+    const updated = members.filter((_, i) => i !== index);
+    setMembers(updated);
+    await persist(updated);
+  }
+
+  async function move(index: number, direction: 'up' | 'down') {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= members.length) return;
+    const updated = [...members];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(target, 0, moved);
+    const reordered = updated.map((m, i) => ({ ...m, sortOrder: i + 1 }));
+    setMembers(reordered);
+    await persist(reordered);
+  }
+
+  async function togglePublish(index: number) {
+    const updated = [...members];
+    updated[index] = { ...updated[index], published: !updated[index].published };
+    setMembers(updated);
+    await persist(updated);
+  }
+
+  return (
+    <Card className="border-border/70 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+          <h3 className="font-semibold">{t.cms.groupTeam}</h3>
+        </div>
+        <Button
+          onClick={openNew}
+          size="sm"
+          className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+        >
+          <Plus className="mr-1.5 h-4 w-4" /> {t.cms.addMember}
+        </Button>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{t.cms.teamIntro}</p>
+
+      <div className="mt-4 space-y-3">
+        {members.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">{t.cms.noMembers}</p>
+        ) : (
+          members.map((m, i) => {
+            const photoSrc = resolveImage({ imageUrl: m.imageUrl, imageKey: m.imageKey || 'training' });
+            return (
+              <div
+                key={m.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-3.5 transition-all hover:border-[#2F6B3F]/40"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-full border border-border bg-secondary">
+                    {photoSrc ? (
+                      <img src={photoSrc} alt="" className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-sm truncate">{m.name}</h4>
+                      <span
+                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          m.published !== false
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {m.published !== false ? t.cms.published : t.cms.hidden}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#2F6B3F] truncate">{m.role.fr}</p>
+                    {m.bio?.fr ? (
+                      <p className="text-xs text-muted-foreground truncate max-w-md">{m.bio.fr}</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => move(i, 'up')}
+                    disabled={i === 0 || saving}
+                    title={t.cms.moveUp}
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => move(i, 'down')}
+                    disabled={i === members.length - 1 || saving}
+                    title={t.cms.moveDown}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => togglePublish(i)}
+                    disabled={saving}
+                    title={m.published !== false ? t.cms.hidden : t.cms.published}
+                  >
+                    {m.published !== false ? <Eye className="h-4 w-4 text-emerald-600" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => openEdit(i)}
+                    title={t.cms.edit}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={() => deleteMember(i)}
+                    title={t.cms.remove}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingIndex !== null ? t.cms.editMember : t.cms.addMember}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleFormSubmit} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>{t.cms.memberName} *</Label>
+              <Input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="Ex. Dr. Fabrice Nkurunziza"
+                required
+                maxLength={100}
+              />
+            </div>
+
+            <BiInput
+              label={t.cms.memberRole}
+              value={formRole}
+              onChange={setFormRole}
+              maxLength={120}
+              hint="Ex: Directeur Général / Managing Director"
+            />
+
+            <BiTextarea
+              label={t.cms.memberBio}
+              value={formBio}
+              onChange={setFormBio}
+              rows={2}
+              maxLength={400}
+            />
+
+            <ImagePicker
+              label={t.cms.memberPhoto}
+              token={token}
+              value={formImage}
+              onChange={setFormImage}
+            />
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <Label htmlFor="member-publish" className="cursor-pointer">
+                {t.cms.visibleLabel}
+              </Label>
+              <Switch
+                id="member-publish"
+                checked={formPublished}
+                onCheckedChange={setFormPublished}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={saving}
+              >
+                {t.cms.cancel}
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving || !formName.trim() || !formRole.fr.trim()}
+                className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+              >
+                {saving ? t.cms.saving : t.cms.save}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+// --- Partners group ---------------------------------------------------------
+
+function PartnersGroup({ token, initial, reload }: GroupProps & { initial: CmsSettings['partners'] }) {
+  const { t, lang } = useSite();
+  const { toast } = useToast();
+  const [items, setItems] = useState<CmsPartner[]>(initial?.items ? [...initial.items] : []);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Form state
+  const [formName, setFormName] = useState('');
+  const [formDescription, setFormDescription] = useState<IText>({ fr: '', en: '' });
+  const [formWebsite, setFormWebsite] = useState('');
+  const [formLogo, setFormLogo] = useState<ImageValue>({ imageKey: 'training', imageUrl: null });
+  const [formPublished, setFormPublished] = useState(true);
+
+  function openNew() {
+    setEditingIndex(null);
+    setFormName('');
+    setFormDescription({ fr: '', en: '' });
+    setFormWebsite('');
+    setFormLogo({ imageKey: 'training', imageUrl: null });
+    setFormPublished(true);
+    setDialogOpen(true);
+  }
+
+  function openEdit(index: number) {
+    const p = items[index];
+    if (!p) return;
+    setEditingIndex(index);
+    setFormName(p.name);
+    setFormDescription(p.description ? { fr: p.description.fr, en: p.description.en } : { fr: '', en: '' });
+    setFormWebsite(p.websiteUrl || '');
+    setFormLogo({ imageKey: p.logoKey || 'training', imageUrl: p.logoUrl || null });
+    setFormPublished(p.published !== false);
+    setDialogOpen(true);
+  }
+
+  async function persist(updated: CmsPartner[]) {
+    setSaving(true);
+    const ok = await saveSetting(token, 'partners', {
+      title: initial?.title || { fr: 'Nos Partenaires & Collaborateurs', en: 'Our Partners & Collaborators' },
+      subtitle: initial?.subtitle || {
+        fr: 'Ensemble pour promouvoir la myciculture et la fertilisation bio au Burundi.',
+        en: 'Working together to promote mushroom farming and bio-organic fertilization in Burundi.',
+      },
+      items: updated,
+    });
+    setSaving(false);
+    if (ok) {
+      toast({ title: t.cms.saved });
+      await reload();
+    } else {
+      toast({ title: t.cms.errorSave, variant: 'destructive' });
+    }
+  }
+
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formName.trim()) return;
+
+    let updated: CmsPartner[];
+    if (editingIndex !== null) {
+      updated = [...items];
+      updated[editingIndex] = {
+        ...updated[editingIndex],
+        name: formName.trim(),
+        description: { fr: formDescription.fr.trim(), en: formDescription.en.trim() || formDescription.fr.trim() },
+        websiteUrl: formWebsite.trim(),
+        logoUrl: formLogo.imageUrl,
+        logoKey: formLogo.imageKey,
+        published: formPublished,
+      };
+    } else {
+      const newPartner: CmsPartner = {
+        id: `partner-${Date.now()}`,
+        name: formName.trim(),
+        description: { fr: formDescription.fr.trim(), en: formDescription.en.trim() || formDescription.fr.trim() },
+        websiteUrl: formWebsite.trim(),
+        logoUrl: formLogo.imageUrl,
+        logoKey: formLogo.imageKey,
+        sortOrder: items.length + 1,
+        published: formPublished,
+      };
+      updated = [...items, newPartner];
+    }
+
+    setItems(updated);
+    setDialogOpen(false);
+    await persist(updated);
+  }
+
+  async function deletePartner(index: number) {
+    const updated = items.filter((_, i) => i !== index);
+    setItems(updated);
+    await persist(updated);
+  }
+
+  async function move(index: number, direction: 'up' | 'down') {
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= items.length) return;
+    const updated = [...items];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(target, 0, moved);
+    const reordered = updated.map((p, i) => ({ ...p, sortOrder: i + 1 }));
+    setItems(reordered);
+    await persist(reordered);
+  }
+
+  async function togglePublish(index: number) {
+    const updated = [...items];
+    updated[index] = { ...updated[index], published: !updated[index].published };
+    setItems(updated);
+    await persist(updated);
+  }
+
+  return (
+    <Card className="border-border/70 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Handshake className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+          <h3 className="font-semibold">{t.cms.groupPartners}</h3>
+        </div>
+        <Button
+          onClick={openNew}
+          size="sm"
+          className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+        >
+          <Plus className="mr-1.5 h-4 w-4" /> {t.cms.addPartner}
+        </Button>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{t.cms.partnersIntro}</p>
+
+      <div className="mt-4 space-y-3">
+        {items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">{t.cms.noPartners}</p>
+        ) : (
+          items.map((p, i) => {
+            const logoSrc = p.logoUrl || (p.logoKey ? resolveImage({ imageKey: p.logoKey }) : null);
+            return (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-3.5 transition-all hover:border-[#2F6B3F]/40"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-secondary flex items-center justify-center p-1">
+                    {logoSrc ? (
+                      <img src={logoSrc} alt="" className="max-h-full max-w-full object-contain" />
+                    ) : (
+                      <Handshake className="h-5 w-5 text-muted-foreground/40" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold text-sm truncate">{p.name}</h4>
+                      <span
+                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                          p.published !== false
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {p.published !== false ? t.cms.published : t.cms.hidden}
+                      </span>
+                    </div>
+                    {p.description?.fr ? (
+                      <p className="text-xs text-muted-foreground truncate max-w-md">{p.description.fr}</p>
+                    ) : null}
+                    {p.websiteUrl ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[#2F6B3F] hover:underline">
+                        <Globe className="h-3 w-3" />
+                        <span className="truncate max-w-[200px]">{p.websiteUrl}</span>
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => move(i, 'up')}
+                    disabled={i === 0 || saving}
+                    title={t.cms.moveUp}
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => move(i, 'down')}
+                    disabled={i === items.length - 1 || saving}
+                    title={t.cms.moveDown}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => togglePublish(i)}
+                    disabled={saving}
+                    title={p.published !== false ? t.cms.hidden : t.cms.published}
+                  >
+                    {p.published !== false ? <Eye className="h-4 w-4 text-emerald-600" /> : <EyeOff className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={() => openEdit(i)}
+                    title={t.cms.edit}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={() => deletePartner(i)}
+                    title={t.cms.remove}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingIndex !== null ? t.cms.editPartner : t.cms.addPartner}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleFormSubmit} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>{t.cms.partnerName} *</Label>
+              <Input
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="Ex. CAPAD Burundi"
+                required
+                maxLength={100}
+              />
+            </div>
+
+            <ImagePicker
+              label={t.cms.partnerLogo}
+              token={token}
+              value={formLogo}
+              onChange={setFormLogo}
+              uploadLabel="Upload logo"
+            />
+
+            <BiInput
+              label={t.cms.partnerDescription}
+              value={formDescription}
+              onChange={setFormDescription}
+              maxLength={150}
+              hint="Ex: Coopérative agricole partenaire / Partner agricultural cooperative"
+            />
+
+            <div className="space-y-1.5">
+              <Label>{t.cms.partnerWebsite}</Label>
+              <Input
+                type="url"
+                value={formWebsite}
+                onChange={(e) => setFormWebsite(e.target.value)}
+                placeholder="https://example.org"
+                maxLength={255}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <Label htmlFor="partner-publish" className="cursor-pointer">
+                {t.cms.visibleLabel}
+              </Label>
+              <Switch
+                id="partner-publish"
+                checked={formPublished}
+                onCheckedChange={setFormPublished}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={saving}
+              >
+                {t.cms.cancel}
+              </Button>
+              <Button
+                type="submit"
+                disabled={saving || !formName.trim()}
+                className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+              >
+                {saving ? t.cms.saving : t.cms.save}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 // --- Security / Passcode group ----------------------------------------------
 
 function SecurityGroup({ token }: { token: string }) {
@@ -541,6 +1202,8 @@ export function SettingsPanel({ token, content, reload }: { token: string; conte
       <p className="text-sm text-muted-foreground">{t.cms.contentIntro}</p>
       <ContactGroup key={`contact-${JSON.stringify(settings.contact)}`} token={token} initial={settings.contact} reload={reload} />
       <HomeGroup key={`home-${JSON.stringify(settings.home)}`} token={token} initial={settings.home} reload={reload} />
+      <TeamGroup key={`team-${JSON.stringify(settings.team)}`} token={token} initial={settings.team} reload={reload} />
+      <PartnersGroup key={`partners-${JSON.stringify(settings.partners)}`} token={token} initial={settings.partners} reload={reload} />
       <TrainingGroup key={`training-${JSON.stringify(settings.training)}`} token={token} initial={settings.training} reload={reload} />
       <AboutGroup key={`about-${JSON.stringify(settings.about)}`} token={token} initial={settings.about} reload={reload} />
       <SustainabilityGroup

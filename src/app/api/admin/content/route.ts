@@ -8,9 +8,10 @@ import { db } from '@/lib/db';
 import { isTransientDbError } from '@/lib/db-retry';
 import { getAdminContent, newsDto, productDto } from '@/lib/cms-server';
 import { IMAGE_LIBRARY, SETTING_KEYS, slugify } from '@/lib/cms-defaults';
-import { ADMIN_TOKEN_HEADER, verifyRequest } from '@/lib/auth';
+import { ADMIN_TOKEN_HEADER, verifyRequestAsync } from '@/lib/auth';
 import { LIMIT_ADMIN_API, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
 import { isAllowedImageUrl } from '@/lib/image-url';
+import { deleteStoredImage } from '@/lib/object-storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +28,16 @@ async function authorize(req: NextRequest): Promise<NextResponse | null> {
     );
   }
 
-  const result = verifyRequest(req.headers.get(ADMIN_TOKEN_HEADER));
+  const result = await verifyRequestAsync(req.headers.get(ADMIN_TOKEN_HEADER));
   if (!result.ok) {
     if (result.reason === 'not-configured') {
       return NextResponse.json({ error: 'Admin authentication is not configured' }, { status: 503 });
+    }
+    if (result.reason === 'revoked') {
+      return NextResponse.json(
+        { error: 'Session revoked — please sign in again' },
+        { status: 401, headers: { 'X-Session-Revoked': '1' } }
+      );
     }
     return NextResponse.json(
       { error: result.reason === 'expired' ? 'Session expired' : 'Unauthorized' },
@@ -254,7 +261,15 @@ export async function PATCH(req: NextRequest) {
       if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
       const img = imageUrlField(d.imageUrl);
       if (!img.ok) return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+
+      // Fetch existing product image URL to clean up storage if replaced
+      const existing = img.value !== undefined ? await db.product.findUnique({ where: { id }, select: { imageUrl: true } }) : null;
+
       await db.product.update({ where: { id }, data: productUpdateData(d, img.value) });
+
+      if (existing?.imageUrl && existing.imageUrl !== img.value) {
+        deleteStoredImage(existing.imageUrl).catch(() => {});
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -262,7 +277,15 @@ export async function PATCH(req: NextRequest) {
       if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
       const img = imageUrlField(d.imageUrl);
       if (!img.ok) return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+
+      // Fetch existing news post image URL to clean up storage if replaced
+      const existing = img.value !== undefined ? await db.newsPost.findUnique({ where: { id }, select: { imageUrl: true } }) : null;
+
       await db.newsPost.update({ where: { id }, data: newsUpdateData(d, img.value) });
+
+      if (existing?.imageUrl && existing.imageUrl !== img.value) {
+        deleteStoredImage(existing.imageUrl).catch(() => {});
+      }
       return NextResponse.json({ ok: true });
     }
 
@@ -278,6 +301,32 @@ export async function PATCH(req: NextRequest) {
         const heroImage = (value as Record<string, unknown>).heroImage;
         if (typeof heroImage === 'string' && heroImage.trim() !== '' && !isAllowedImageUrl(heroImage.trim())) {
           return NextResponse.json({ error: 'Invalid hero image URL' }, { status: 400 });
+        }
+      }
+      if (key === 'team') {
+        const members = (value as Record<string, unknown>).members;
+        if (Array.isArray(members)) {
+          for (const m of members) {
+            if (m && typeof m === 'object') {
+              const img = (m as Record<string, unknown>).imageUrl;
+              if (typeof img === 'string' && img.trim() !== '' && !isAllowedImageUrl(img.trim())) {
+                return NextResponse.json({ error: 'Invalid team member image URL' }, { status: 400 });
+              }
+            }
+          }
+        }
+      }
+      if (key === 'partners') {
+        const items = (value as Record<string, unknown>).items;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item && typeof item === 'object') {
+              const logo = (item as Record<string, unknown>).logoUrl;
+              if (typeof logo === 'string' && logo.trim() !== '' && !isAllowedImageUrl(logo.trim())) {
+                return NextResponse.json({ error: 'Invalid partner logo URL' }, { status: 400 });
+              }
+            }
+          }
         }
       }
       await db.siteSetting.upsert({
@@ -312,9 +361,13 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
     if (kind === 'product') {
+      const existing = await db.product.findUnique({ where: { id }, select: { imageUrl: true } });
       await db.product.delete({ where: { id } });
+      if (existing?.imageUrl) deleteStoredImage(existing.imageUrl).catch(() => {});
     } else {
+      const existing = await db.newsPost.findUnique({ where: { id }, select: { imageUrl: true } });
       await db.newsPost.delete({ where: { id } });
+      if (existing?.imageUrl) deleteStoredImage(existing.imageUrl).catch(() => {});
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

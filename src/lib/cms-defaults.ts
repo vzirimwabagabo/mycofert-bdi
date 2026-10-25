@@ -56,8 +56,8 @@ export function imageSrc(imageKey: string): string {
  * path that bypasses the admin API — a bad import, a future migration — into
  * stored XSS. isAllowedImageUrl is the same allowlist the CSP img-src uses.
  */
-export function resolveImage(item: { imageUrl?: string | null; imageKey: string }): string {
-  return isAllowedImageUrl(item.imageUrl) ? (item.imageUrl as string).trim() : imageSrc(item.imageKey);
+export function resolveImage(item: { imageUrl?: string | null; imageKey?: string }): string {
+  return isAllowedImageUrl(item.imageUrl) ? (item.imageUrl as string).trim() : imageSrc(item.imageKey || 'fresh');
 }
 
 // ---------------------------------------------------------------------------
@@ -140,16 +140,60 @@ export interface CmsSustainability {
   cycleText: IText;
 }
 
+export interface CmsTeamMember {
+  id: string;
+  name: string;
+  role: IText;
+  bio?: IText;
+  imageUrl?: string | null;
+  imageKey?: string;
+  sortOrder: number;
+  published: boolean;
+}
+
+export interface CmsTeam {
+  title: IText;
+  subtitle: IText;
+  members: CmsTeamMember[];
+}
+
+export interface CmsPartner {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  logoKey?: string;
+  description?: IText;
+  websiteUrl?: string;
+  sortOrder: number;
+  published: boolean;
+}
+
+export interface CmsPartners {
+  title: IText;
+  subtitle: IText;
+  items: CmsPartner[];
+}
+
 export interface CmsSettings {
   contact: CmsContact;
   home: CmsHome;
   training: CmsTraining;
   about: CmsAbout;
   sustainability: CmsSustainability;
+  team: CmsTeam;
+  partners: CmsPartners;
 }
 
 export type SettingKey = keyof CmsSettings;
-export const SETTING_KEYS: SettingKey[] = ['contact', 'home', 'training', 'about', 'sustainability'];
+export const SETTING_KEYS: SettingKey[] = [
+  'contact',
+  'home',
+  'training',
+  'about',
+  'sustainability',
+  'team',
+  'partners',
+];
 
 // ---------------------------------------------------------------------------
 // Defaults (derived from the built-in dictionaries so the CMS starts pre-filled)
@@ -190,6 +234,128 @@ export const DEFAULT_SETTINGS: CmsSettings = {
     title: it(fr.sustainability.title, en.sustainability.title),
     subtitle: it(fr.sustainability.subtitle, en.sustainability.subtitle),
     cycleText: it(fr.sustainability.cycleText, en.sustainability.cycleText),
+  },
+  team: {
+    title: it('Notre Équipe', 'Our Team'),
+    subtitle: it(
+      'Des professionnels engagés pour une agriculture durable et prospère au Burundi.',
+      'Passionate professionals committed to sustainable and prosperous agriculture in Burundi.'
+    ),
+    members: [
+      {
+        id: 'team-1',
+        name: 'Dr. Fabrice Nkurunziza',
+        role: it('Directeur Général & Co-fondateur', 'Managing Director & Co-Founder'),
+        bio: it(
+          'Spécialiste en biotechnologie végétale et valorisation circulaire de la biomasse.',
+          'Specialist in plant biotechnology and circular biomass valorisation.'
+        ),
+        imageKey: 'training',
+        imageUrl: null,
+        sortOrder: 1,
+        published: true,
+      },
+      {
+        id: 'team-2',
+        name: 'Mireille Uwimana',
+        role: it('Responsable Myciculture & Qualité', 'Mushroom Production & Quality Lead'),
+        bio: it(
+          'Ingénieure agronome dédiée à la préparation des substrats et au contrôle de fructification.',
+          'Agronomist dedicated to substrate formulation and fruiting chamber management.'
+        ),
+        imageKey: 'fresh',
+        imageUrl: null,
+        sortOrder: 2,
+        published: true,
+      },
+      {
+        id: 'team-3',
+        name: 'Jean-Claude Hakizimana',
+        role: it('Responsable Engrais Bio & Valorisation', 'Bio-Fertilizer & Composting Lead'),
+        bio: it(
+          'Expert en recyclage du substrat usé et formulation d’amendements organiques.',
+          'Expert in spent substrate upcycling and organic soil conditioner formulation.'
+        ),
+        imageKey: 'fertilizer',
+        imageUrl: null,
+        sortOrder: 3,
+        published: true,
+      },
+      {
+        id: 'team-4',
+        name: 'Chantal Ndayisaba',
+        role: it('Coordinatrice Formation & Partenariats', 'Training & Partnerships Coordinator'),
+        bio: it(
+          'Animatrice de projets communautaires pour l’autonomisation des jeunes et des femmes.',
+          'Community trainer passionate about youth and women empowerment through mushroom farming.'
+        ),
+        imageKey: 'hero',
+        imageUrl: null,
+        sortOrder: 4,
+        published: true,
+      },
+    ],
+  },
+  partners: {
+    title: it('Nos Partenaires & Collaborateurs', 'Our Partners & Collaborators'),
+    subtitle: it(
+      'Ensemble pour promouvoir la myciculture et la fertilisation bio au Burundi.',
+      'Working together to promote mushroom farming and bio-organic fertilization in Burundi.'
+    ),
+    items: [
+      {
+        id: 'partner-1',
+        name: 'CAPAD Burundi',
+        description: it(
+          'Confédération des Associations des Producteurs Agricoles pour le Développement',
+          'Confederation of Agricultural Producer Associations for Development'
+        ),
+        websiteUrl: 'https://capad.bi',
+        logoUrl: null,
+        logoKey: 'training',
+        sortOrder: 1,
+        published: true,
+      },
+      {
+        id: 'partner-2',
+        name: 'ISABU',
+        description: it(
+          'Institut des Sciences Agronomiques du Burundi — Recherche & semences',
+          'Burundi Agronomic Sciences Institute — Research & Spawn Collaboration'
+        ),
+        websiteUrl: '',
+        logoUrl: null,
+        logoKey: 'fresh',
+        sortOrder: 2,
+        published: true,
+      },
+      {
+        id: 'partner-3',
+        name: 'Burundi Agribusiness Network',
+        description: it(
+          'Réseau d’entrepreneuriat agroalimentaire et développement rural',
+          'Agribusiness entrepreneurship and rural development network'
+        ),
+        websiteUrl: '',
+        logoUrl: null,
+        logoKey: 'sustainability',
+        sortOrder: 3,
+        published: true,
+      },
+      {
+        id: 'partner-4',
+        name: 'Coopérative Twitezimbere',
+        description: it(
+          'Groupement local de producteurs et transformateurs de champignons',
+          'Local mushroom growers and processors cooperative'
+        ),
+        websiteUrl: '',
+        logoUrl: null,
+        logoKey: 'fertilizer',
+        sortOrder: 4,
+        published: true,
+      },
+    ],
   },
 };
 
@@ -275,11 +441,34 @@ export function mergeSettings(raw: CmsSettings | Record<string, unknown>): CmsSe
       ? ({ ...DEFAULT_SETTINGS[key], ...(r as object) } as CmsSettings[K])
       : DEFAULT_SETTINGS[key];
   };
+
+  const pickTeam = (): CmsTeam => {
+    const r = source['team'] as Partial<CmsTeam> | undefined;
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return DEFAULT_SETTINGS.team;
+    return {
+      title: r.title ? { ...DEFAULT_SETTINGS.team.title, ...r.title } : DEFAULT_SETTINGS.team.title,
+      subtitle: r.subtitle ? { ...DEFAULT_SETTINGS.team.subtitle, ...r.subtitle } : DEFAULT_SETTINGS.team.subtitle,
+      members: Array.isArray(r.members) ? r.members : DEFAULT_SETTINGS.team.members,
+    };
+  };
+
+  const pickPartners = (): CmsPartners => {
+    const r = source['partners'] as Partial<CmsPartners> | undefined;
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return DEFAULT_SETTINGS.partners;
+    return {
+      title: r.title ? { ...DEFAULT_SETTINGS.partners.title, ...r.title } : DEFAULT_SETTINGS.partners.title,
+      subtitle: r.subtitle ? { ...DEFAULT_SETTINGS.partners.subtitle, ...r.subtitle } : DEFAULT_SETTINGS.partners.subtitle,
+      items: Array.isArray(r.items) ? r.items : DEFAULT_SETTINGS.partners.items,
+    };
+  };
+
   return {
     contact: pick('contact'),
     home: pick('home'),
     training: pick('training'),
     about: pick('about'),
     sustainability: pick('sustainability'),
+    team: pickTeam(),
+    partners: pickPartners(),
   };
 }

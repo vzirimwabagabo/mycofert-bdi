@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { isTransientDbError, withDbRetry } from '@/lib/db-retry';
-import { ADMIN_TOKEN_HEADER, verifyRequest } from '@/lib/auth';
+import { ADMIN_TOKEN_HEADER, verifyRequestAsync } from '@/lib/auth';
 import {
   LIMIT_ADMIN_API,
   rateLimitRequest,
@@ -16,6 +16,15 @@ const PAGE_SIZE_DEFAULT = 50;
 const PAGE_SIZE_MAX = 200;
 
 /**
+ * How many days of PageView data to include in the dashboard analytics.
+ * Limiting the window keeps the GROUP BY fast even with a large table by
+ * allowing Postgres to use a partial index or range scan instead of scanning
+ * the entire table. The full retention period (PAGEVIEW_RETENTION_DAYS) still
+ * applies for pruning — this is only a query bound.
+ */
+const ANALYTICS_WINDOW_DAYS = 30;
+
+/**
  * Authorise an admin request.
  * Returns a NextResponse to send on failure, or null when the caller may proceed.
  */
@@ -28,10 +37,18 @@ async function authorize(req: NextRequest): Promise<NextResponse | null> {
     );
   }
 
-  const result = verifyRequest(req.headers.get(ADMIN_TOKEN_HEADER));
+  // verifyRequestAsync performs the session-version check: tokens issued before
+  // a passcode change are rejected even within their 12-hour TTL window.
+  const result = await verifyRequestAsync(req.headers.get(ADMIN_TOKEN_HEADER));
   if (!result.ok) {
     if (result.reason === 'not-configured') {
       return NextResponse.json({ error: 'Admin authentication is not configured' }, { status: 503 });
+    }
+    if (result.reason === 'revoked') {
+      return NextResponse.json(
+        { error: 'Session revoked — please sign in again' },
+        { status: 401, headers: { 'X-Session-Revoked': '1' } }
+      );
     }
     // Distinguish "expired" so the client can prompt for the passcode again
     // without treating it as a spoofing attempt.
@@ -71,6 +88,12 @@ export async function GET(req: NextRequest) {
     //
     // Paginated explicitly: the previous fixed `take: 500` made the dashboard
     // silently wrong once the table grew past the cap.
+    //
+    // Analytics window: pageview aggregation is capped to ANALYTICS_WINDOW_DAYS
+    // (30 days) so the GROUP BY scans a bounded range rather than the full
+    // table. The total count still reflects the complete retention window, but
+    // the top-pages breakdown is explicitly labelled as "last 30 days".
+    const analyticsAfter = new Date(Date.now() - ANALYTICS_WINDOW_DAYS * 86_400_000);
     const [inquiries, total, byStatus, byPath, byType] = await withDbRetry(
       () =>
         db.$transaction([
@@ -82,7 +105,11 @@ export async function GET(req: NextRequest) {
           }),
           db.inquiry.count({ where }),
           db.inquiry.groupBy({ by: ['status'], _count: { _all: true } }),
-          db.pageView.groupBy({ by: ['path'], _count: { path: true } }),
+          db.pageView.groupBy({
+            by: ['path'],
+            where: { createdAt: { gte: analyticsAfter } },
+            _count: { path: true },
+          }),
           db.inquiry.groupBy({ by: ['type'], _count: { type: true } }),
         ]),
       'admin/data GET'
@@ -114,6 +141,9 @@ export async function GET(req: NextRequest) {
         filtered: total,
         newCount,
         pageviews: pageviewTotal,
+        // pageviews and topPages are bounded to the last ANALYTICS_WINDOW_DAYS days
+        // so the query stays fast as the table grows.
+        analyticsWindowDays: ANALYTICS_WINDOW_DAYS,
         byType: typeMap,
         topPages,
       },

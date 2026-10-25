@@ -241,11 +241,32 @@ at all, it injects it, rebuilds, and keeps a `.zbak` of the original config.
 
 ### TLS and the reverse proxy
 
-[Caddyfile](../Caddyfile) terminates TLS (automatic ACME certificates) and
-reverse-proxies to `localhost:3000`, **overwriting** `X-Forwarded-For`,
-`X-Forwarded-Proto` and `X-Real-IP` from the socket address. Replacing the
-hostname `{$DOMAIN:localhost}` with the real domain is the only edit a normal
-deployment needs.
+### Multi-instance proxy and load balancing
+
+[Caddyfile](../Caddyfile) provides production TLS termination (automatic ACME
+certificates) and reverse-proxies to the application instance(s).
+
+Key proxy settings configured in [Caddyfile](../Caddyfile):
+- **Request body limits:** Restricted via `request_body { max_size 2MB }` to block oversized payloads early at the proxy boundary. (Direct browser-to-S3 uploads bypass this proxy).
+- **Client IP forwarding:** `X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Real-IP` are safely overwritten from the client socket `{remote_host}`, ensuring spoofed upstream headers cannot bypass IP rate limiting (`TRUST_PROXY=1`).
+- **Health-based routing:** Active health checks (`/api/health`) run every 10s. Unresponsive or failing instances are pulled from rotation automatically until they recover.
+- **Multi-replica scale out:** The upstream accepts a list of targets (or an environment variable `APP_UPSTREAM`, default `localhost:3000`). Example:
+  ```caddy
+  reverse_proxy app1:3000 app2:3000 app3:3000 {
+      health_uri      /api/health
+      health_interval 10s
+      health_timeout  3s
+      health_status   200
+  }
+  ```
+
+### CDN, WAF, and DDoS mitigation
+
+Placing a managed CDN / WAF layer (e.g. Cloudflare or AWS CloudFront + AWS WAF) in front of Caddy is strongly recommended for production:
+1. **L7 DDoS protection & Bot management:** Mitigates volumetric layer-7 attacks and credential stuffing before traffic hits Caddy or the Next.js process.
+2. **WAF rules:** Blocks malicious payloads (SQL injection, XSS probes, path traversal attempts) and enforces geographic or ASN rate-limiting.
+3. **Static asset caching:** Edge-caches `/_next/static/*` and `/images/*` with long TTLs, offloading 90%+ of bandwidth and requests from application instances.
+4. **Header sanitation:** Ensure the edge CDN is configured to send the genuine client IP (e.g. `CF-Connecting-IP`) and that Caddy forwards this IP to the application.
 
 > A `?XTransformPort=` block used to sit in this file. It proxied to **any**
 > localhost port on request — an SSRF primitive that turned the proxy into a
@@ -494,18 +515,27 @@ Set `PAGEVIEW_RETENTION_DAYS=0` to disable pruning entirely. Do that only if you
 have another retention mechanism, because the dashboard's "top pages" aggregate
 scans the whole table.
 
-### Backups
+### Backups and disaster recovery
 
-Managed Postgres (Neon, Supabase) provides point-in-time recovery — use the
-provider's console. There is no application-level backup.
+1. **Database Backups:**
+   - **Point-in-Time Recovery (PITR):** Managed Postgres (Neon, Supabase) provides continuous WAL archiving and automated point-in-time recovery. Verify PITR retention settings in the provider console (minimum 7 days recommended).
+   - **Automated Logical Backups (`pg_dump`):** Schedule a daily automated logical export using `pg_dump` stored in an isolated, immutable backup bucket:
+     ```bash
+     pg_dump "$DIRECT_URL" -Fc -f "mycofert_backup_$(date +%Y%m%d).dump"
+     ```
+   - **Drill / Verification:** Test restoring the backup once a month into a staging database to verify schema and data integrity.
 
-Two things are **not** in the database and are worth keeping a copy of:
+2. **Image Storage Backups & Retention:**
+   - **Bucket Versioning:** Enable versioning on the S3 / Supabase storage bucket so accidental deletions or overwrites can be reverted.
+   - **Cross-Region Replication (CRR):** For disaster recovery, configure replication of the media bucket to a secondary region.
+   - **Local Library Backup:** Ensure `public/images/` is committed to git repository backups.
 
-- `public/images/` — the local image library
-- The Cloudinary assets referenced by `Product.imageUrl` / `NewsPost.imageUrl`
+### Storage cleanup and orphan management
 
-Deleting a product or news post permanently removes its row (no soft-delete, no
-undo). The Cloudinary asset survives, but nothing points at it any more.
+Direct-to-bucket uploads can leave orphaned objects if a user selects a file and closes the browser before saving, or if an item image is replaced/removed:
+1. **Automatic Cleanup on Mutation:** The application now triggers `deleteStoredImage()` in the background whenever a product or news post image is updated or deleted in the admin dashboard.
+2. **Bucket Lifecycle Policy for Abandoned Uploads:** Presigned URLs expire after 5 minutes (`PRESIGN_TTL_SECONDS = 300`). Configure an S3 lifecycle rule to automatically abort incomplete multipart uploads after 1 day.
+3. **Orphan Audit Script:** Periodically cross-reference objects stored under the `mycofert/` prefix with URLs present in `Product.imageUrl`, `NewsPost.imageUrl`, and `SiteSetting.value` (key `home`). Any S3 key older than 7 days not present in the database can be safely purged.
 
 ### Inspecting data
 
