@@ -31,12 +31,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useSite } from './context';
 import { BiInput, BiTextarea, ImagePicker, authHeaders, type AdminContent } from './admin-ui';
-import { imageSrc, slugify, type CmsProduct, type IText } from '@/lib/cms-defaults';
+import { resolveImage, slugify, type CmsProduct, type IText } from '@/lib/cms-defaults';
 import { ArrowDown, ArrowUp, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface ProductForm {
   slug: string;
   imageKey: string;
+  imageUrl: string | null;
   published: boolean;
   sortOrder: number;
   name: IText;
@@ -48,8 +49,9 @@ interface ProductForm {
 
 function toForm(p: CmsProduct): ProductForm {
   return {
-    slug: p.slug,
-    imageKey: p.imageKey,
+  slug: p.slug,
+  imageKey: p.imageKey,
+  imageUrl: p.imageUrl ?? null,
     published: p.published,
     sortOrder: p.sortOrder,
     name: { ...p.name },
@@ -64,6 +66,7 @@ function emptyForm(sortOrder: number): ProductForm {
   return {
     slug: '',
     imageKey: 'fresh',
+    imageUrl: null,
     published: true,
     sortOrder,
     name: { fr: '', en: '' },
@@ -78,6 +81,7 @@ function toPayload(f: ProductForm) {
   return {
     slug: f.slug,
     imageKey: f.imageKey,
+    imageUrl: f.imageUrl,
     published: f.published,
     sortOrder: f.sortOrder,
     nameFr: f.name.fr,
@@ -211,7 +215,7 @@ export function ProductsPanel({
   }
 
   return (
-    <div>
+    <div data-tour="admin-products">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t.cms.productsTitle}</h2>
@@ -229,7 +233,7 @@ export function ProductsPanel({
           products.map((product, i) => (
             <Card key={product.id} className="flex flex-wrap items-center gap-4 border-border/70 p-4">
               <img
-                src={imageSrc(product.imageKey)}
+                src={resolveImage(product)}
                 alt=""
                 aria-hidden="true"
                 className="h-14 w-20 shrink-0 rounded-lg object-cover"
@@ -310,8 +314,9 @@ export function ProductsPanel({
             <div className="space-y-4">
               <ImagePicker
                 label={t.cms.fieldImage}
-                value={form.imageKey}
-                onChange={(imageKey) => setForm({ ...form, imageKey })}
+                token={token}
+                value={{ imageKey: form.imageKey, imageUrl: form.imageUrl }}
+                onChange={(v) => setForm({ ...form, imageKey: v.imageKey, imageUrl: v.imageUrl })}
               />
 
               <div className="flex items-center gap-3">

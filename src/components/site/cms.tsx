@@ -2,16 +2,18 @@
 
 // Content management provider for the public site.
 //
-// Hydration safety: the initial state is the built-in dictionary content —
-// identical on the server and during the first client render. The database
-// content is fetched in an effect AFTER hydration, so any difference is a
-// normal post-hydration update, never a hydration mismatch.
+// Hydration safety: the initial state is either the content the SERVER
+// rendered into the page (initialContent prop — content is in the first-paint
+// HTML, which is what crawlers and visitors on slow networks see) or, when
+// absent (e.g. /admin), the built-in dictionary defaults — identical on the
+// server and during the first client render either way.
 //
-// Fallback safety: if the fetch fails (offline DB, network error), the site
-// simply keeps rendering the built-in dictionary content.
+// Fallback safety: if a refresh fails (offline DB, network error), the site
+// simply keeps rendering whatever content it already has.
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Lang } from '@/lib/i18n';
+import { onPathChange } from './context';
 import {
   DEFAULT_NEWS,
   DEFAULT_PRODUCTS,
@@ -25,7 +27,7 @@ import {
 } from '@/lib/cms-defaults';
 
 interface CmsState {
-  /** True once the database content has been applied (or a fetch completed). */
+  /** True once database content has been applied (initialContent or a fetch). */
   ready: boolean;
   settings: CmsSettings;
   /** Published products, sorted for display. */
@@ -45,15 +47,30 @@ function fallbackState(): CmsState {
   };
 }
 
-interface PublicContent {
-  settings: Record<string, unknown>;
+export interface PublicContent {
+  settings: CmsSettings;
   products: CmsProduct[];
   news: CmsNews[];
 }
 
-export function CmsProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<CmsState>(fallbackState);
-
+export function CmsProvider({
+  children,
+  initialContent,
+}: {
+  children: React.ReactNode;
+  /** Content fetched server-side alongside the page; skipped when absent. */
+  initialContent?: PublicContent;
+}) {
+  const [state, setState] = useState<CmsState>(() =>
+    initialContent
+      ? {
+          ready: true,
+          settings: mergeSettings(initialContent.settings ?? {}),
+          products: Array.isArray(initialContent.products) ? initialContent.products : DEFAULT_PRODUCTS,
+          news: Array.isArray(initialContent.news) ? initialContent.news : DEFAULT_NEWS,
+        }
+      : fallbackState()
+  );
   useEffect(() => {
     let disposed = false;
 
@@ -70,24 +87,24 @@ export function CmsProvider({ children }: { children: React.ReactNode }) {
             news: Array.isArray(json.news) ? json.news : DEFAULT_NEWS,
           });
         })
-        .catch((error: unknown) => {
-          if ((error as Error)?.name === 'AbortError') return;
+        .catch(() => {
           // Keep current content — the site stays fully functional.
           if (!disposed) setState((prev) => ({ ...prev, ready: true }));
         });
     }
 
-    refresh();
+    // The server already delivered fresh content with this page; only fetch
+    // immediately when we started from dictionary fallbacks.
+    if (!initialContent) refresh();
 
-    // The site is a hash-routed SPA: navigating between pages does NOT reload
-    // the document. Refetch on every hash navigation so the owner immediately
-    // sees their saved edits when previewing the public pages.
-    window.addEventListener('hashchange', refresh);
+    // Navigation is client-side (pushState): re-fetch on every path change
+    // so the owner immediately sees saved edits when previewing public pages.
+    const off = onPathChange(refresh);
     return () => {
       disposed = true;
-      window.removeEventListener('hashchange', refresh);
+      off();
     };
-  }, []);
+  }, [initialContent]);
 
   return <CmsCtx.Provider value={state}>{children}</CmsCtx.Provider>;
 }

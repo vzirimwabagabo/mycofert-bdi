@@ -11,9 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useSite } from './context';
-import { BiInput, BiTextarea, LangChip, authHeaders, type AdminContent } from './admin-ui';
+import { BiInput, BiTextarea, ImagePicker, LangChip, authHeaders, type AdminContent } from './admin-ui';
 import type { CmsSettings, IText } from '@/lib/cms-defaults';
-import { Mail, MapPin, MessageCircle, Home, GraduationCap, Recycle, Info, Plus, Trash2 } from 'lucide-react';
+import { Mail, MapPin, MessageCircle, Home, GraduationCap, Recycle, Info, Plus, Trash2, Lock, KeyRound } from 'lucide-react';
 
 async function saveSetting(token: string, key: string, value: unknown): Promise<boolean> {
   const res = await fetch('/api/admin/content', {
@@ -196,6 +196,13 @@ function HomeGroup({ token, initial, reload }: GroupProps & { initial: CmsSettin
         <BiInput label={t.cms.heroBadgeLabel} value={form.heroBadge} onChange={(heroBadge) => setForm({ ...form, heroBadge })} maxLength={120} />
         <BiInput label={t.cms.heroTitleLabel} value={form.heroTitle} onChange={(heroTitle) => setForm({ ...form, heroTitle })} maxLength={200} />
         <BiTextarea label={t.cms.heroSubtitleLabel} value={form.heroSubtitle} onChange={(heroSubtitle) => setForm({ ...form, heroSubtitle })} rows={2} maxLength={400} />
+        {/* Hero image: Cloudinary upload wins; '' falls back to the local hero file in public/images. */}
+        <ImagePicker
+          label={t.cms.heroImageLabel}
+          token={token}
+          value={{ imageKey: 'hero', imageUrl: form.heroImage || null }}
+          onChange={(v) => setForm({ ...form, heroImage: v.imageUrl ?? '' })}
+        />
         <div className="grid gap-4 sm:grid-cols-3">
           <BiInput label={t.cms.stat1Label} value={form.stat1} onChange={(stat1) => setForm({ ...form, stat1 })} maxLength={80} />
           <BiInput label={t.cms.stat2Label} value={form.stat2} onChange={(stat2) => setForm({ ...form, stat2 })} maxLength={80} />
@@ -309,6 +316,220 @@ function SustainabilityGroup({ token, initial, reload }: GroupProps & { initial:
   );
 }
 
+// --- Security / Passcode group ----------------------------------------------
+
+function SecurityGroup({ token }: { token: string }) {
+  const { t } = useSite();
+  const { toast } = useToast();
+  const [currentPasscode, setCurrentPasscode] = useState('');
+  const [newPasscode, setNewPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  async function onUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPasscode.length < 12) {
+      toast({ title: t.cms.errorSave, description: t.cms.passcodeTooShort, variant: 'destructive' });
+      return;
+    }
+    if (newPasscode !== confirmPasscode) {
+      toast({ title: t.cms.errorSave, description: t.cms.passcodeMismatch, variant: 'destructive' });
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/admin/change-passcode', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ currentPasscode, newPasscode }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (res.ok) {
+        toast({ title: t.cms.passcodeUpdated });
+        setCurrentPasscode('');
+        setNewPasscode('');
+        setConfirmPasscode('');
+      } else {
+        toast({
+          title: t.cms.errorSave,
+          description: data?.error || t.cms.passcodeUpdateError,
+          variant: 'destructive',
+        });
+      }
+    } catch {
+      toast({ title: t.cms.errorSave, description: t.cms.passcodeUpdateError, variant: 'destructive' });
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  return (
+    <Card className="border-border/70 p-6" data-tour="admin-security">
+      <div className="flex items-center gap-2">
+        <Lock className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+        <h3 className="font-semibold">{t.cms.groupSecurity}</h3>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{t.cms.securityIntro}</p>
+
+      <form onSubmit={onUpdate} className="mt-4 space-y-4 max-w-lg">
+        <div className="space-y-1">
+          <Label htmlFor="current-passcode">{t.cms.currentPasscodeLabel}</Label>
+          <Input
+            id="current-passcode"
+            type="password"
+            value={currentPasscode}
+            onChange={(e) => setCurrentPasscode(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="new-passcode">{t.cms.newPasscodeLabel}</Label>
+          <Input
+            id="new-passcode"
+            type="password"
+            value={newPasscode}
+            onChange={(e) => setNewPasscode(e.target.value)}
+            required
+            minLength={12}
+            autoComplete="new-password"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label htmlFor="confirm-passcode">{t.cms.confirmPasscodeLabel}</Label>
+          <Input
+            id="confirm-passcode"
+            type="password"
+            value={confirmPasscode}
+            onChange={(e) => setConfirmPasscode(e.target.value)}
+            required
+            minLength={12}
+            autoComplete="new-password"
+          />
+        </div>
+
+        <div className="pt-2">
+          <Button
+            type="submit"
+            disabled={updating || !currentPasscode || !newPasscode || !confirmPasscode}
+            className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+          >
+            {updating ? t.cms.saving : t.cms.updatePasscodeBtn}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// --- Recovery code group ----------------------------------------------------
+
+/**
+ * Issues the code that gets the owner back in after a forgotten passcode.
+ *
+ * The current passcode is required even though the session token is already
+ * valid: a stolen token must not be enough to mint a credential that outlives
+ * the session and survives a later passcode change.
+ */
+function RecoveryGroup({ token }: { token: string }) {
+  const { t } = useSite();
+  const { toast } = useToast();
+  const [passcode, setPasscode] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [issued, setIssued] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function onGenerate(e: React.FormEvent) {
+    e.preventDefault();
+    setGenerating(true);
+    try {
+      const res = await fetch('/api/admin/recovery-code', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ passcode }),
+      });
+      const data = (await res.json().catch(() => null)) as { recoveryCode?: string; error?: string } | null;
+
+      if (res.ok && data?.recoveryCode) {
+        setIssued(data.recoveryCode);
+        setPasscode('');
+        setCopied(false);
+        toast({ title: t.cms.recoveryGenerated });
+      } else {
+        toast({
+          title: t.cms.errorSave,
+          description: data?.error || t.cms.recoveryFailed,
+          variant: 'destructive',
+        });
+      }
+    } catch {
+      toast({ title: t.cms.errorSave, description: t.cms.recoveryFailed, variant: 'destructive' });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function copyCode() {
+    if (!issued) return;
+    try {
+      await navigator.clipboard.writeText(issued);
+      setCopied(true);
+    } catch {
+      /* clipboard unavailable — the code is on screen to be written down */
+    }
+  }
+
+  return (
+    <Card className="border-border/70 p-6">
+      <div className="flex items-center gap-2">
+        <KeyRound className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+        <h3 className="font-semibold">{t.cms.recoveryGroupTitle}</h3>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{t.cms.recoveryIntro}</p>
+
+      <form onSubmit={onGenerate} className="mt-4 space-y-4 max-w-lg">
+        <div className="space-y-1">
+          <Label htmlFor="recovery-current-passcode">{t.cms.recoveryRequiresPasscode}</Label>
+          <Input
+            id="recovery-current-passcode"
+            type="password"
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={generating || !passcode}
+          className="bg-[#2F6B3F] text-white hover:bg-[#275A34]"
+        >
+          {generating ? t.cms.saving : t.cms.recoveryGenerateBtn}
+        </Button>
+      </form>
+
+      {issued ? (
+        <div className="mt-5 max-w-lg rounded-md border border-[#2F6B3F]/40 bg-secondary/40 p-4">
+          <p className="text-sm text-muted-foreground">{t.cms.recoveryShownOnce}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <code className="flex-1 select-all break-all font-mono text-base tracking-widest">{issued}</code>
+            <Button type="button" variant="outline" size="sm" onClick={copyCode}>
+              {copied ? t.admin.copied : t.admin.copy}
+            </Button>
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={() => setIssued(null)}>
+            {t.cms.recoverySaved}
+          </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 // --- Panel ------------------------------------------------------------------
 
 export function SettingsPanel({ token, content, reload }: { token: string; content: AdminContent; reload: () => Promise<void> }) {
@@ -316,7 +537,7 @@ export function SettingsPanel({ token, content, reload }: { token: string; conte
   const { settings } = content;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-tour="admin-content">
       <p className="text-sm text-muted-foreground">{t.cms.contentIntro}</p>
       <ContactGroup key={`contact-${JSON.stringify(settings.contact)}`} token={token} initial={settings.contact} reload={reload} />
       <HomeGroup key={`home-${JSON.stringify(settings.home)}`} token={token} initial={settings.home} reload={reload} />
@@ -328,6 +549,8 @@ export function SettingsPanel({ token, content, reload }: { token: string; conte
         initial={settings.sustainability}
         reload={reload}
       />
+      <SecurityGroup token={token} />
+      <RecoveryGroup token={token} />
     </div>
   );
 }

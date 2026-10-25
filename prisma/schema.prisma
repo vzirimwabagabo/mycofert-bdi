@@ -14,8 +14,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Inquiry {
@@ -58,6 +59,9 @@ model Product {
   sortOrder Int      @default(0)
   published Boolean  @default(true)
   imageKey  String   @default("fresh")
+  // Optional Cloudinary-hosted image (uploaded via the admin dashboard).
+  // Takes precedence over imageKey when set; validated to be an https URL.
+  imageUrl  String?
   nameFr    String
   nameEn    String
   taglineFr String   @default("")
@@ -80,6 +84,9 @@ model NewsPost {
   slug      String   @unique
   published Boolean  @default(true)
   imageKey  String   @default("training")
+  // Optional Cloudinary-hosted image (uploaded via the admin dashboard).
+  // Takes precedence over imageKey when set; validated to be an https URL.
+  imageUrl  String?
   dateFr    String   @default("")
   dateEn    String   @default("")
   titleFr   String

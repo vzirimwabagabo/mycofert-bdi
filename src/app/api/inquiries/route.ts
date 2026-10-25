@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { LIMIT_INQUIRIES, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
 
+export const dynamic = 'force-dynamic';
+
 const ALLOWED_TYPES = ['product', 'bulk', 'fertilizer', 'training', 'partnership'] as const;
 
 /** Pragmatic email check — deliberately permissive, rejects obvious garbage only. */
@@ -9,7 +11,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
 
 /** Strip control characters that have no place in stored text. */
 function clean(value: string): string {
-  // eslint-disable-next-line no-control-regex
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
 }
 

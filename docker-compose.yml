@@ -1,0 +1,28 @@
+# Local development database.
+#
+# The production database is PostgreSQL (Supabase free tier — see
+# docs/supabase-setup-guide.md). This compose file gives you the same engine
+# locally so migrations and seeds behave identically.
+#
+#   docker compose up -d     # start
+#   docker compose down      # stop (data persists in the mycofert_pgdata volume)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mycofert-db
+    environment:
+      POSTGRES_USER: mycofert
+      POSTGRES_PASSWORD: mycofert_dev
+      POSTGRES_DB: mycofert
+    ports:
+      - "5432:5432"
+    volumes:
+      - mycofert_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycofert -d mycofert"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  mycofert_pgdata:

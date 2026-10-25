@@ -10,7 +10,7 @@ import { Check, Package } from 'lucide-react';
 import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { PageHero, CtaPair } from './bits';
-import { imageSrc } from '@/lib/cms-defaults';
+import { resolveImage } from '@/lib/cms-defaults';
 import { SITE, telLink, waLink } from '@/lib/site';
 import { MessageCircle } from 'lucide-react';
 
@@ -25,13 +25,13 @@ export function ProductsPage() {
     <div>
       <PageHero title={t.products.title} subtitle={t.products.subtitle} />
 
-      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16" data-tour="products-list">
         <div className="grid gap-8 lg:grid-cols-2">
           {products.map((item) => (
             <Card key={item.id} className="flex flex-col overflow-hidden border-border/70">
               <div className="aspect-[16/9] bg-secondary">
                 <img
-                  src={imageSrc(item.imageKey)}
+                  src={resolveImage(item)}
                   alt={L(item.name)}
                   loading="lazy"
                   className="h-full w-full object-cover"
@@ -75,7 +75,7 @@ export function ProductsPage() {
           <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2">
             <div className="overflow-hidden rounded-2xl">
               <img
-                src={imageSrc(fertilizer.imageKey)}
+                src={resolveImage(fertilizer)}
                 alt={t.products.fertilizerTitle}
                 loading="lazy"
                 className="aspect-[4/3] w-full object-cover"

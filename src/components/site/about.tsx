@@ -6,6 +6,7 @@ import { BadgeCheck, Sprout, Users, Leaf, Quote, Package, Recycle, GraduationCap
 import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
+import { imageSrc } from '@/lib/cms-defaults';
 
 const ACTIVITY_ICONS = [Package, Sprout, Recycle, GraduationCap];
 
@@ -29,7 +30,7 @@ export function AboutPage() {
           </div>
           <div className="overflow-hidden rounded-2xl">
             <img
-              src="/images/hero.png"
+              src={imageSrc('hero')}
               alt={t.about.title}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"

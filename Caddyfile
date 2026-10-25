@@ -1,23 +1,22 @@
-:81 {
-	@transform_port_query {
-		query XTransformPort=*
-	}
+# Production TLS termination and reverse proxy for MYCOFERT Burundi.
+#
+# The XTransformPort sandbox-preview block has been REMOVED. It was an
+# SSRF primitive: any request with ?XTransformPort=<port> would proxy to
+# any localhost service on the box.
+#
+# TLS: Caddy auto-obtains a certificate via ACME. Replace the hostname
+# below with your real domain in production.
+#
+# In the z.ai sandbox the site still listens on :80 without a hostname
+# so the health-check proxy path works; strip the {$DOMAIN} block for
+# that environment.
 
-	handle @transform_port_query {
-		reverse_proxy localhost:{query.XTransformPort} {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
-	}
-
-	handle {
-		reverse_proxy localhost:3000 {
-			header_up Host {host}
-			header_up X-Forwarded-For {remote_host}
-			header_up X-Forwarded-Proto {scheme}
-			header_up X-Real-IP {remote_host}
-		}
+{$DOMAIN:localhost} {
+	# Forward all traffic to the Next.js process.
+	reverse_proxy localhost:3000 {
+		header_up Host {host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
 	}
 }

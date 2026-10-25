@@ -1,89 +1,37 @@
 'use client';
 
+// Site routing state. The URL is the source of truth (real paths, no hash):
+// the server renders the initial route into the HTML, and after hydration a
+// client-side external store tracks pathname changes driven by pushState /
+// popstate from navigate() and setLang().
+
 import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from 'react';
-import { DEFAULT_LANG, getDict, isLang, type Dict, type Lang } from '@/lib/i18n';
+import { DEFAULT_LANG, getDict, type Dict, type Lang } from '@/lib/i18n';
+import { hrefFor, parsePath, type PageId, type Route } from '@/lib/route';
 
-export type PageId =
-  | 'home'
-  | 'products'
-  | 'about'
-  | 'sustainability'
-  | 'training'
-  | 'news'
-  | 'news-post'
-  | 'contact'
-  | 'admin';
-
-export interface Route {
-  page: PageId;
-  lang: Lang;
-  slug?: string; // news post slug
-  isAdmin: boolean;
-}
-
-/** Parse "#/en/products" or "#/admin" into a Route. */
-export function parseHash(hash: string, fallbackLang: Lang): Route {
-  const raw = hash.replace(/^#\/?/, '').replace(/\/+$/, '');
-  if (raw === 'admin') return { page: 'admin', lang: fallbackLang, isAdmin: true };
-  const parts = raw.split('/').filter(Boolean);
-  let lang: Lang = fallbackLang;
-  if (parts.length > 0 && isLang(parts[0])) {
-    lang = parts[0];
-    parts.shift();
-  }
-  const seg = parts[0] ?? 'home';
-  const pageMap: Record<string, PageId> = {
-    home: 'home',
-    produits: 'products',
-    products: 'products',
-    'a-propos': 'about',
-    about: 'about',
-    durabilite: 'sustainability',
-    sustainability: 'sustainability',
-    formation: 'training',
-    training: 'training',
-    actualites: 'news',
-    news: 'news',
-    contact: 'contact',
-  };
-  let page = pageMap[seg] ?? 'home';
-  let slug: string | undefined;
-  if (page === 'news' && parts[1]) {
-    page = 'news-post';
-    slug = parts[1];
-  }
-  return { page, lang, slug, isAdmin: false };
-}
-
-/** Build a hash URL. */
-export function hrefFor(lang: Lang, page: PageId, slug?: string): string {
-  if (page === 'admin') return '#/admin';
-  if (page === 'home') return `#/${lang}`;
-  if (page === 'news-post' && slug) return `#/${lang}/news/${slug}`;
-  return `#/${lang}/${page}`;
-}
-
-// ---------------------------------------------------------------------------
-// External store for client-only routing state (window.location.hash + the
-// stored language preference).
-//
-// Hydration safety: the snapshot is EMPTY on the server AND during the
-// client's first (hydration) render, so the server HTML and the first client
-// render always match exactly. Real browser state is adopted once AFTER
-// hydration from a useEffect — any resulting difference is a normal
-// post-hydration re-render, never a hydration mismatch. (Reading
-// localStorage/location during the hydration render is the classic cause of
-// "server rendered text didn't match the client" errors.)
-// ---------------------------------------------------------------------------
+export type { PageId, Route };
+export { hrefFor };
 
 const LANG_KEY = 'mycofert-lang';
 
+// ---------------------------------------------------------------------------
+// External store for client-only routing state (window.location.pathname +
+// the stored language preference).
+//
+// Hydration safety: the snapshot is EMPTY on the server AND during the
+// client's first (hydration) render — SiteProvider falls back to the
+// server-derived initialRoute, so server HTML and first client render match
+// exactly. Real browser state is adopted once AFTER hydration from a
+// useEffect; any resulting difference is a normal post-hydration re-render,
+// never a hydration mismatch.
+// ---------------------------------------------------------------------------
+
 interface ExtState {
-  hash: string;
+  path: string;
   storedLang: Lang | null;
 }
 
-const INITIAL_EXT_STATE: ExtState = { hash: '', storedLang: null };
+const INITIAL_EXT_STATE: ExtState = { path: '', storedLang: null };
 
 let extState: ExtState = INITIAL_EXT_STATE;
 const extListeners = new Set<() => void>();
@@ -95,18 +43,22 @@ function notifyExt() {
 function readStoredLang(): Lang | null {
   try {
     const v = window.localStorage.getItem(LANG_KEY);
-    return isLang(v) ? v : null;
+    return isLangStored(v);
   } catch {
     return null;
   }
 }
 
+function isLangStored(v: string | null): Lang | null {
+  return v === 'fr' || v === 'en' ? v : null;
+}
+
 /** Adopt real browser state into the store. Call from effects/handlers only. */
 function syncExtState() {
-  const hash = window.location.hash;
+  const path = window.location.pathname;
   const storedLang = readStoredLang();
-  if (hash === extState.hash && storedLang === extState.storedLang) return;
-  extState = { hash, storedLang };
+  if (path === extState.path && storedLang === extState.storedLang) return;
+  extState = { path, storedLang };
   notifyExt();
 }
 
@@ -119,6 +71,17 @@ function subscribeExt(cb: () => void) {
 const getExtSnapshot = (): ExtState => extState;
 const getExtServerSnapshot = (): ExtState => INITIAL_EXT_STATE;
 
+/**
+ * Subscribe to client-side path changes (pushState from navigate()/setLang()
+ * and popstate). Used by CmsProvider to refresh content on navigation.
+ */
+export function onPathChange(cb: () => void): () => void {
+  extListeners.add(cb);
+  return () => {
+    extListeners.delete(cb);
+  };
+}
+
 interface SiteCtx {
   route: Route;
   lang: Lang;
@@ -129,29 +92,39 @@ interface SiteCtx {
 
 const Ctx = createContext<SiteCtx | null>(null);
 
-export function SiteProvider({ children }: { children: React.ReactNode }) {
+export function SiteProvider({
+  children,
+  initialRoute,
+}: {
+  children: React.ReactNode;
+  /** Route parsed on the server from the request URL — keeps first paint and hydration correct. */
+  initialRoute: Route;
+}) {
   const ext = useSyncExternalStore(subscribeExt, getExtSnapshot, getExtServerSnapshot);
 
-  const route = parseHash(ext.hash, ext.storedLang ?? DEFAULT_LANG);
+  const route = ext.path
+    ? (parsePath(ext.path, ext.storedLang ?? initialRoute.lang) ?? initialRoute)
+    : initialRoute;
 
-  // Adopt real hash + stored language AFTER hydration, then keep in sync.
+  // Adopt the real URL + stored language AFTER hydration, then stay in sync
+  // with the browser Back/Forward buttons.
   useEffect(() => {
     syncExtState();
-    const onHash = () => syncExtState();
-    window.addEventListener('hashchange', onHash);
+    const onPop = () => syncExtState();
+    window.addEventListener('popstate', onPop);
 
-    // Dedicated language URLs: promote hashes without a language segment
-    // (bare "/") to an explicit #/fr or #/en URL — but never hijack #/admin.
-    const raw = window.location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
-    if (raw !== 'admin' && !isLang(raw.split('/')[0] ?? '')) {
+    // Canonicalize a bare "/" visit to an explicit language path, preferring
+    // the visitor's stored choice. replaceState — no reload, no history entry.
+    if (window.location.pathname === '/') {
       const lang = readStoredLang() ?? DEFAULT_LANG;
-      window.location.replace(hrefFor(lang, 'home'));
+      window.history.replaceState({}, '', hrefFor(lang, 'home'));
+      syncExtState();
     }
 
-    return () => window.removeEventListener('hashchange', onHash);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // Per-language document metadata + first-party analytics (external systems only).
+  // Per-language document metadata + first-party analytics.
   // Note: news-post pages set their own document title (see NewsPostPage),
   // because parent effects run after child effects and would overwrite it.
   useEffect(() => {
@@ -161,11 +134,13 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
     if (route.page !== 'news-post') {
       document.title = t.meta.title;
     }
+    const path = hrefFor(route.lang, route.page, route.slug);
+    if (path === '/') return; // about to be canonicalized to a language path
     const controller = new AbortController();
     fetch('/api/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: `/${route.lang}/${route.page}`, lang: route.lang }),
+      body: JSON.stringify({ path, lang: route.lang }),
       signal: controller.signal,
     }).catch(() => {});
     return () => controller.abort();
@@ -174,8 +149,9 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
   const navigate = useCallback(
     (page: PageId, slug?: string) => {
       const target = hrefFor(route.lang, page, slug);
-      if (window.location.hash !== target) {
-        window.location.hash = target.slice(1);
+      if (window.location.pathname !== target) {
+        window.history.pushState({}, '', target);
+        syncExtState();
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
@@ -190,12 +166,13 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
         /* storage unavailable */
       }
       if (route.isAdmin) {
-        syncExtState(); // admin hash has no lang segment — apply via stored preference
+        syncExtState(); // admin path has no lang segment — apply via stored preference
         return;
       }
       const target = hrefFor(next, route.page, route.slug);
-      if (window.location.hash !== target) {
-        window.location.hash = target.slice(1);
+      if (window.location.pathname !== target) {
+        window.history.pushState({}, '', target);
+        syncExtState();
       }
     },
     [route.isAdmin, route.page, route.slug]

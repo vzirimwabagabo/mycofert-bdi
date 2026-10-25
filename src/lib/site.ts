@@ -10,6 +10,9 @@ export const SITE = {
   country: 'Burundi',
 } as const;
 
+/** Canonical public origin for metadata/sitemap absolute URLs (env-overridable). */
+export const SITE_URL = (process.env.SITE_URL ?? 'https://mycofert.bi').replace(/\/+$/, '');
+
 export const WHATSAPP_MESSAGES: Record<string, string> = {
   fr: 'Bonjour MYCOFERT Burundi, je souhaite passer une commande.',
   en: 'Hello MYCOFERT Burundi, I would like to place an order.',

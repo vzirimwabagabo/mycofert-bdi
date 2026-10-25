@@ -9,7 +9,7 @@ import {
 import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { SectionHeading, CtaPair } from './bits';
-import { imageSrc } from '@/lib/cms-defaults';
+import { resolveImage, imageSrc } from '@/lib/cms-defaults';
 import { waLink } from '@/lib/site';
 import {
   Bed,
@@ -41,9 +41,9 @@ export function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative isolate overflow-hidden bg-[#234D30] text-white">
+      <section className="relative isolate overflow-hidden bg-[#234D30] text-white" data-tour="hero">
         <img
-          src="/images/hero.png"
+          src={home.heroImage || imageSrc('hero')}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-cover opacity-35"
@@ -88,7 +88,7 @@ export function HomePage() {
       </section>
 
       {/* Product categories */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20" data-tour="home-products">
         <SectionHeading title={t.home.categoriesTitle} subtitle={t.home.categoriesSubtitle} />
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((item) => (
@@ -98,7 +98,7 @@ export function HomePage() {
             >
               <div className="aspect-[16/10] overflow-hidden bg-secondary">
                 <img
-                  src={imageSrc(item.imageKey)}
+                  src={resolveImage(item)}
                   alt={L(item.name)}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -143,7 +143,7 @@ export function HomePage() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div className="overflow-hidden rounded-2xl">
             <img
-              src="/images/sustainability.png"
+              src={imageSrc('sustainability')}
               alt={t.home.sustainabilityTitle}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"
@@ -205,7 +205,7 @@ export function HomePage() {
           </div>
           <div className="order-1 overflow-hidden rounded-2xl lg:order-2">
             <img
-              src="/images/training.png"
+              src={imageSrc('training')}
               alt={t.home.trainingTeaserTitle}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"
@@ -223,7 +223,7 @@ export function HomePage() {
               <Card key={post.id} className="overflow-hidden border-border/70 transition-shadow hover:shadow-md">
                 <div className="aspect-[16/9] bg-secondary">
                   <img
-                    src={imageSrc(post.imageKey)}
+                    src={resolveImage(post)}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"

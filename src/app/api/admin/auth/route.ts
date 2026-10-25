@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isAuthConfigured, issueToken } from '@/lib/auth';
+import { isAuthConfigured, issueTokenAsync } from '@/lib/auth';
 import { LIMIT_ADMIN_AUTH, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   // Rate limit before doing any work, so brute force costs the attacker even
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
   // instead of silently accepting a default passcode.
   if (!isAuthConfigured()) {
     console.error(
-      '[api/admin/auth] ADMIN_PASSCODE / ADMIN_SESSION_SECRET are not configured — refusing logins.'
+      '[api/admin/auth] ADMIN_SESSION_SECRET is not configured — refusing logins.'
     );
     return NextResponse.json(
       { error: 'Admin authentication is not configured on this server.' },
@@ -29,10 +31,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const passcode = body && typeof body === 'object' ? (body as { passcode?: unknown }).passcode : undefined;
 
-    const result = issueToken(passcode);
+    const result = await issueTokenAsync(passcode);
     if (!result.ok) {
-      // Same message and status for every failure — do not reveal whether the
-      // passcode was missing, wrong, or the server unconfigured.
+      // Operator errors get distinct, actionable statuses; a wrong passcode
+      // gets the generic 401 so nothing about the credential is revealed.
+      if (result.reason === 'weak-passcode') {
+        return NextResponse.json(
+          { error: 'The configured admin passcode is too weak (minimum 12 characters).' },
+          { status: 400, headers: rateLimitHeaders(limit) }
+        );
+      }
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401, headers: rateLimitHeaders(limit) }

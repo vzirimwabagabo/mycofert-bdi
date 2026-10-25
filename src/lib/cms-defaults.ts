@@ -10,15 +10,21 @@
 // All editable text is bilingual: IText = { fr, en }.
 
 import { SITE } from '@/lib/site';
+import { isAllowedImageUrl } from '@/lib/image-url';
 import { fr } from '@/lib/i18n/fr';
 import { en } from '@/lib/i18n/en';
+import imageManifest from './image-manifest.json';
 
 export interface IText {
   fr: string;
   en: string;
 }
 
-/** Preset image library (public/images/*.png) the owner can pick from. */
+/**
+ * Preset image library (files in public/images) the owner can pick from.
+ * Keys are file basenames — the extension is resolved at build time by
+ * scripts/gen-image-manifest.mjs, so fresh.jpg works exactly like fresh.png.
+ */
 export const IMAGE_LIBRARY = [
   'fresh',
   'dried',
@@ -33,8 +39,25 @@ export const IMAGE_LIBRARY = [
 
 export type ImageKey = (typeof IMAGE_LIBRARY)[number];
 
+/** basename -> public URL, regenerated from public/images by scripts/gen-image-manifest.mjs. */
+const IMAGE_FILES = imageManifest as Record<string, string>;
+
 export function imageSrc(imageKey: string): string {
-  return `/images/${(IMAGE_LIBRARY as readonly string[]).includes(imageKey) ? imageKey : 'fresh'}.png`;
+  const key = (IMAGE_LIBRARY as readonly string[]).includes(imageKey) ? imageKey : 'fresh';
+  return IMAGE_FILES[key] ?? IMAGE_FILES.fresh ?? `/images/${key}.png`;
+}
+
+/**
+ * Resolve the display image for a product/news item: an uploaded URL (object
+ * storage, or a legacy Cloudinary URL) wins over the local library key.
+ *
+ * The URL is validated rather than trusted. It reaches this function from the
+ * database, and rendering it straight into an <img src> would turn any write
+ * path that bypasses the admin API — a bad import, a future migration — into
+ * stored XSS. isAllowedImageUrl is the same allowlist the CSP img-src uses.
+ */
+export function resolveImage(item: { imageUrl?: string | null; imageKey: string }): string {
+  return isAllowedImageUrl(item.imageUrl) ? (item.imageUrl as string).trim() : imageSrc(item.imageKey);
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +70,8 @@ export interface CmsProduct {
   sortOrder: number;
   published: boolean;
   imageKey: string;
+  /** Cloudinary-hosted image; when set it takes precedence over imageKey. */
+  imageUrl?: string | null;
   name: IText;
   tagline: IText;
   description: IText;
@@ -63,6 +88,8 @@ export interface CmsNews {
   slug: string;
   published: boolean;
   imageKey: string;
+  /** Cloudinary-hosted image; when set it takes precedence over imageKey. */
+  imageUrl?: string | null;
   date: IText;
   title: IText;
   excerpt: IText;
@@ -87,6 +114,8 @@ export interface CmsHome {
   heroBadge: IText;
   heroTitle: IText;
   heroSubtitle: IText;
+  /** Optional Cloudinary URL for the hero image; '' falls back to the local hero file in public/images. */
+  heroImage: string;
   stat1: IText;
   stat2: IText;
   stat3: IText;
@@ -141,6 +170,7 @@ export const DEFAULT_SETTINGS: CmsSettings = {
     heroBadge: it(fr.home.heroBadge, en.home.heroBadge),
     heroTitle: it(fr.home.heroTitle, en.home.heroTitle),
     heroSubtitle: it(fr.home.heroSubtitle, en.home.heroSubtitle),
+    heroImage: '',
     stat1: it(fr.home.heroStat1, en.home.heroStat1),
     stat2: it(fr.home.heroStat2, en.home.heroStat2),
     stat3: it(fr.home.heroStat3, en.home.heroStat3),
@@ -237,9 +267,10 @@ export function slugify(text: string): string {
  * Merge raw (partially saved) settings from the database over the defaults.
  * Each group is merged shallowly, so a saved group always wins field by field.
  */
-export function mergeSettings(raw: Record<string, unknown>): CmsSettings {
+export function mergeSettings(raw: CmsSettings | Record<string, unknown>): CmsSettings {
+  const source = raw as Record<string, unknown>;
   const pick = <K extends SettingKey>(key: K): CmsSettings[K] => {
-    const r = raw[key];
+    const r = source[key];
     return r && typeof r === 'object' && !Array.isArray(r)
       ? ({ ...DEFAULT_SETTINGS[key], ...(r as object) } as CmsSettings[K])
       : DEFAULT_SETTINGS[key];

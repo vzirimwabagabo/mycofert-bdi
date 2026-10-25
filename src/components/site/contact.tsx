@@ -72,7 +72,7 @@ export function ContactPage() {
         <div className="mx-auto mt-14 max-w-3xl">
           <h2 className="text-2xl font-bold tracking-tight">{t.contact.formTitle}</h2>
           <p className="mt-2 text-muted-foreground">{t.contact.formSubtitle}</p>
-          <Card className="mt-6 border-border/70 p-6 sm:p-8">
+          <Card className="mt-6 border-border/70 p-6 sm:p-8" data-tour="contact-form">
             <InquiryForm />
           </Card>
         </div>

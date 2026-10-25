@@ -2,6 +2,7 @@
 // Used by /api/content (public) and /api/admin/content (token-protected).
 
 import { db } from '@/lib/db';
+import { withDbRetry } from '@/lib/db-retry';
 import type { NewsPost, Product } from '@prisma/client';
 import {
   DEFAULT_NEWS,
@@ -93,6 +94,7 @@ export function productDto(p: Product): CmsProduct {
     sortOrder: p.sortOrder,
     published: p.published,
     imageKey: p.imageKey,
+    imageUrl: p.imageUrl,
     name: { fr: p.nameFr, en: p.nameEn },
     tagline: { fr: p.taglineFr, en: p.taglineEn },
     description: { fr: p.descFr, en: p.descEn },
@@ -107,6 +109,7 @@ export function newsDto(n: NewsPost): CmsNews {
     slug: n.slug,
     published: n.published,
     imageKey: n.imageKey,
+    imageUrl: n.imageUrl,
     date: { fr: n.dateFr, en: n.dateEn },
     title: { fr: n.titleFr, en: n.titleEn },
     excerpt: { fr: n.excerptFr, en: n.excerptEn },
@@ -115,8 +118,8 @@ export function newsDto(n: NewsPost): CmsNews {
   };
 }
 
-export async function loadRawSettings(): Promise<Record<string, unknown>> {
-  const rows = await db.siteSetting.findMany({ where: { key: { in: SETTING_KEYS } } });
+/** Turn SiteSetting rows into the raw settings object (broken JSON is skipped). */
+function parseSettingsRows(rows: { key: string; value: string }[]): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
   for (const row of rows) {
     try {
@@ -128,29 +131,72 @@ export async function loadRawSettings(): Promise<Record<string, unknown>> {
   return raw;
 }
 
+/**
+ * Timestamp of the last public-content read that fell back to built-in content.
+ * Null while the database is answering.
+ *
+ * getPublicContent() keeps serving built-in content when the database is
+ * unreachable — an outdated page beats a 500 — but that trade-off must never be
+ * invisible: an outage would otherwise look like a healthy page quietly showing
+ * the wrong prices and products. The failure is recorded here so that
+ * /api/content (response header) and /api/health?deep=1 can advertise it.
+ */
+let contentFallbackAt: string | null = null;
+
+/** Whether the public site is currently being served from built-in fallback content. */
+export function getContentHealth(): { degraded: boolean; lastFallbackAt: string | null } {
+  return { degraded: contentFallbackAt !== null, lastFallbackAt: contentFallbackAt };
+}
+
 /** Public payload: settings + published products/news only. */
 export async function getPublicContent() {
-  await ensureSeeded();
-  const [raw, products, news] = await Promise.all([
-    loadRawSettings(),
-    db.product.findMany({
-      where: { published: true },
-      orderBy: [{ sortOrder: 'asc' }, { nameFr: 'asc' }],
-    }),
-    db.newsPost.findMany({ where: { published: true }, orderBy: { createdAt: 'desc' } }),
-  ]);
-  const settings: CmsSettings = mergeSettings(raw);
-  return { settings, products: products.map(productDto), news: news.map(newsDto) };
+  try {
+    await ensureSeeded();
+    // Batched into one round trip: the pool holds a single connection, so three
+    // separate queries would queue and each pay its own network round trip.
+    const [settingRows, products, news] = await withDbRetry(
+      () =>
+        db.$transaction([
+          db.siteSetting.findMany({ where: { key: { in: SETTING_KEYS } } }),
+          db.product.findMany({
+            where: { published: true },
+            orderBy: [{ sortOrder: 'asc' }, { nameFr: 'asc' }],
+          }),
+          db.newsPost.findMany({ where: { published: true }, orderBy: { createdAt: 'desc' } }),
+        ]),
+      'public content'
+    );
+    const settings: CmsSettings = mergeSettings(parseSettingsRows(settingRows));
+    contentFallbackAt = null;
+    return { settings, products: products.map(productDto), news: news.map(newsDto) };
+  } catch (error) {
+    contentFallbackAt = new Date().toISOString();
+    console.error(
+      '[cms-server] ⚠️  SERVING PLACEHOLDER CONTENT: the database read failed, so public pages ' +
+        'are showing built-in defaults instead of the stored products/news/settings. ' +
+        'The site looks healthy but the data on it is NOT the data in the database.',
+      error
+    );
+    return {
+      settings: mergeSettings({}),
+      products: DEFAULT_PRODUCTS,
+      news: DEFAULT_NEWS,
+    };
+  }
 }
 
 /** Admin payload: everything, including unpublished items. */
 export async function getAdminContent() {
   await ensureSeeded();
-  const [raw, products, news] = await Promise.all([
-    loadRawSettings(),
-    db.product.findMany({ orderBy: [{ sortOrder: 'asc' }, { nameFr: 'asc' }] }),
-    db.newsPost.findMany({ orderBy: { createdAt: 'desc' } }),
-  ]);
-  const settings: CmsSettings = mergeSettings(raw);
+  const [settingRows, products, news] = await withDbRetry(
+    () =>
+      db.$transaction([
+        db.siteSetting.findMany({ where: { key: { in: SETTING_KEYS } } }),
+        db.product.findMany({ orderBy: [{ sortOrder: 'asc' }, { nameFr: 'asc' }] }),
+        db.newsPost.findMany({ orderBy: { createdAt: 'desc' } }),
+      ]),
+    'admin content'
+  );
+  const settings: CmsSettings = mergeSettings(parseSettingsRows(settingRows));
   return { settings, products: products.map(productDto), news: news.map(newsDto) };
 }

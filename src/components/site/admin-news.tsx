@@ -32,12 +32,13 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useSite } from './context';
 import { BiInput, BiTextarea, ImagePicker, authHeaders, type AdminContent } from './admin-ui';
-import { imageSrc, slugify, type CmsNews, type IText } from '@/lib/cms-defaults';
+import { resolveImage, slugify, type CmsNews, type IText } from '@/lib/cms-defaults';
 import { CalendarDays, Newspaper, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface NewsForm {
   slug: string;
   imageKey: string;
+  imageUrl: string | null;
   published: boolean;
   date: IText;
   title: IText;
@@ -49,6 +50,7 @@ function toForm(n: CmsNews): NewsForm {
   return {
     slug: n.slug,
     imageKey: n.imageKey,
+    imageUrl: n.imageUrl ?? null,
     published: n.published,
     date: { ...n.date },
     title: { ...n.title },
@@ -64,6 +66,7 @@ function emptyForm(): NewsForm {
   return {
     slug: '',
     imageKey: 'training',
+    imageUrl: null,
     published: true,
     date: { fr: label.charAt(0).toUpperCase() + label.slice(1), en: labelEn.charAt(0).toUpperCase() + labelEn.slice(1) },
     title: { fr: '', en: '' },
@@ -76,6 +79,7 @@ function toPayload(f: NewsForm) {
   return {
     slug: f.slug,
     imageKey: f.imageKey,
+    imageUrl: f.imageUrl,
     published: f.published,
     dateFr: f.date.fr,
     dateEn: f.date.en,
@@ -178,7 +182,7 @@ export function NewsPanel({
   }
 
   return (
-    <div>
+    <div data-tour="admin-news">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{t.cms.newsTitle}</h2>
@@ -196,7 +200,7 @@ export function NewsPanel({
           content.news.map((post) => (
             <Card key={post.id} className="flex flex-wrap items-center gap-4 border-border/70 p-4">
               <img
-                src={imageSrc(post.imageKey)}
+                src={resolveImage(post)}
                 alt=""
                 aria-hidden="true"
                 className="h-14 w-20 shrink-0 rounded-lg object-cover"
@@ -258,8 +262,9 @@ export function NewsPanel({
             <div className="space-y-4">
               <ImagePicker
                 label={t.cms.fieldImage}
-                value={form.imageKey}
-                onChange={(imageKey) => setForm({ ...form, imageKey })}
+                token={token}
+                value={{ imageKey: form.imageKey, imageUrl: form.imageUrl }}
+                onChange={(v) => setForm({ ...form, imageKey: v.imageKey, imageUrl: v.imageUrl })}
               />
 
               <div className="flex items-center gap-3">

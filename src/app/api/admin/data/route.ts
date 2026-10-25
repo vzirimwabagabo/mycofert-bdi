@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { isTransientDbError, withDbRetry } from '@/lib/db-retry';
 import { ADMIN_TOKEN_HEADER, verifyRequest } from '@/lib/auth';
 import {
   LIMIT_ADMIN_API,
@@ -7,6 +8,8 @@ import {
   rateLimitHeaders,
   getClientIp,
 } from '@/lib/rate-limit';
+
+export const dynamic = 'force-dynamic';
 
 /** Default page size for the inquiry list. */
 const PAGE_SIZE_DEFAULT = 50;
@@ -58,22 +61,36 @@ export async function GET(req: NextRequest) {
     const statusFilter = searchParams.get('status');
     const where = statusFilter === 'new' || statusFilter === 'handled' ? { status: statusFilter } : {};
 
+    // One $transaction rather than seven parallel promises. The pool holds a
+    // single connection (connection_limit=1), so separate queries queue behind
+    // one another and each pays a full network round trip; on a slow link that
+    // is how a remote database turns into P2024 "timed out fetching a
+    // connection from the pool". Batching costs one round trip instead, and the
+    // "new" badge and total pageviews are derived from the groupings below so
+    // they need no query of their own.
+    //
     // Paginated explicitly: the previous fixed `take: 500` made the dashboard
     // silently wrong once the table grew past the cap.
-    const [inquiries, total, totalAll, pageviewTotal, byPath, byType, newCount] = await Promise.all([
-      db.inquiry.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      db.inquiry.count({ where }),
-      db.inquiry.count(),
-      db.pageView.count(),
-      db.pageView.groupBy({ by: ['path'], _count: { path: true } }),
-      db.inquiry.groupBy({ by: ['type'], _count: { type: true } }),
-      db.inquiry.count({ where: { status: 'new' } }),
-    ]);
+    const [inquiries, total, byStatus, byPath, byType] = await withDbRetry(
+      () =>
+        db.$transaction([
+          db.inquiry.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }),
+          db.inquiry.count({ where }),
+          db.inquiry.groupBy({ by: ['status'], _count: { _all: true } }),
+          db.pageView.groupBy({ by: ['path'], _count: { path: true } }),
+          db.inquiry.groupBy({ by: ['type'], _count: { type: true } }),
+        ]),
+      'admin/data GET'
+    );
+
+    const totalAll = byStatus.reduce((sum, row) => sum + row._count._all, 0);
+    const newCount = byStatus.find((row) => row.status === 'new')?._count._all ?? 0;
+    const pageviewTotal = byPath.reduce((sum, row) => sum + row._count.path, 0);
 
     const topPages = byPath
       .map((p) => ({ path: p.path, count: p._count.path }))
@@ -102,6 +119,13 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (isTransientDbError(error)) {
+      console.error('[api/admin/data] GET: database temporarily unavailable:', error);
+      return NextResponse.json(
+        { error: 'The database is temporarily unavailable. Please retry.', code: 'DB_UNAVAILABLE' },
+        { status: 503, headers: { 'Retry-After': '5', 'X-Db-Unavailable': '1' } }
+      );
+    }
     console.error('[api/admin/data] GET failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

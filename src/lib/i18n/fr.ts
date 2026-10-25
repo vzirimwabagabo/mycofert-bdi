@@ -333,6 +333,19 @@ export const fr = {
     login: 'Se connecter',
     logout: 'Se déconnecter',
     wrongPasscode: 'Code incorrect.',
+    forgotPasscode: 'Code d\'accès oublié ?',
+    recoverTitle: 'Récupérer l\'accès',
+    recoverIntro: 'Saisissez le code de secours que vous avez conservé, puis choisissez un nouveau code d\'accès.',
+    recoveryCodeLabel: 'Code de secours',
+    recoveryCodePlaceholder: 'XXXX-XXXX-XXXX-XXXX',
+    resetPasscodeBtn: 'Réinitialiser le code d\'accès',
+    backToLogin: 'Retour à la connexion',
+    resetFailed: 'Impossible de réinitialiser le code d\'accès.',
+    newRecoveryCodeTitle: 'Code d\'accès réinitialisé',
+    newRecoveryCodeIntro: 'Voici votre nouveau code de secours. Notez-le et conservez-le en lieu sûr : il remplace l\'ancien et ne sera plus affiché.',
+    recoverySignInPrompt: 'Vous pouvez maintenant vous connecter avec votre nouveau code d\'accès.',
+    copy: 'Copier',
+    copied: 'Copié',
     statTotal: 'Demandes totales',
     statNew: 'Nouvelles demandes',
     statPageviews: 'Visites de pages',
@@ -377,6 +390,9 @@ export const fr = {
     hidden: 'Masqué',
     visibleLabel: 'Visible sur le site',
     loading: 'Chargement…',
+    loadError:
+      'Impossible de charger les données. La base de données est peut-être momentanément indisponible.',
+    retry: 'Réessayer',
     empty: 'Rien ici pour le moment. Cliquez sur « Ajouter » pour commencer.',
     duplicateSlug: 'Cet identifiant est déjà utilisé. Choisissez-en un autre.',
     // Bilingual field helper
@@ -429,6 +445,7 @@ export const fr = {
     heroBadgeLabel: 'Badge du bandeau d\u2019accueil',
     heroTitleLabel: 'Grand titre d\u2019accueil',
     heroSubtitleLabel: 'Sous-titre d\u2019accueil',
+    heroImageLabel: 'Image d\u2019accueil (grand bandeau)',
     stat1Label: 'Légende statistique 1',
     stat2Label: 'Légende statistique 2',
     stat3Label: 'Légende statistique 3',
@@ -442,6 +459,119 @@ export const fr = {
     sustainTitleLabel: 'Titre',
     sustainSubtitleLabel: 'Sous-titre',
     cycleLabel: 'Texte « Agriculture circulaire »',
+    // Security & passcode
+    groupSecurity: 'Sécurité et code d\'accès',
+    securityIntro: 'Modifier le code d\'accès requis pour se connecter à cet espace d\'administration. Enregistré sous forme de hachage cryptographique sécurisé.',
+    currentPasscodeLabel: 'Code d\'accès actuel',
+    newPasscodeLabel: 'Nouveau code d\'accès (min. 12 caractères)',
+    confirmPasscodeLabel: 'Confirmer le nouveau code d\'accès',
+    updatePasscodeBtn: 'Mettre à jour le code d\'accès',
+    passcodeMismatch: 'Les nouveaux codes d\'accès ne correspondent pas.',
+    passcodeTooShort: 'Le nouveau code doit contenir au moins 12 caractères.',
+    passcodeUpdated: 'Code d\'accès administrateur mis à jour avec succès.',
+    passcodeUpdateError: 'Échec de la mise à jour. Vérifiez que le code actuel est correct.',
+    // Code de secours
+    recoveryGroupTitle: 'Code de secours',
+    recoveryIntro: 'Si vous oubliez votre code d\'accès, le code de secours est le seul moyen de revenir. Générez-en un et conservez-le en lieu sûr — sur papier ou dans votre téléphone, pas uniquement sur cet ordinateur.',
+    recoveryRequiresPasscode: 'Saisissez votre code d\'accès actuel pour générer un code de secours.',
+    recoveryGenerateBtn: 'Générer un code de secours',
+    recoveryGenerated: 'Code de secours généré',
+    recoveryShownOnce: 'Copiez ce code maintenant. Il n\'est affiché qu\'une seule fois et remplace tout code de secours précédent.',
+    recoverySaved: 'Je l\'ai conservé',
+    recoveryFailed: 'Impossible de générer un code de secours.',
+  },
+  // Visite guidée (bulle « Guide » en bas à gauche). La structure des étapes
+  // (page, ancre, onglet) vit dans src/components/site/tour-steps.ts ; ici, seul
+  // le texte. Chaque clé de `steps` doit exister en anglais aussi, sinon le
+  // typecheck échoue.
+  tour: {
+    launch: 'Guide',
+    menuPublic: 'Visite du site public',
+    menuAdmin: 'Visite de l\u2019espace d\u2019administration',
+    skip: 'Passer la visite',
+    prev: 'Précédent',
+    next: 'Suivant',
+    finish: 'Terminer',
+    close: 'Fermer la visite',
+    counter: 'Étape {n} sur {total}',
+    steps: {
+      nav: {
+        title: 'Le menu principal',
+        body: 'Accueil, Produits, À propos, Durabilité, Formation, Actualités et Contact. Ouvrez le sélecteur de langue à droite pour basculer entre le français et l\u2019anglais.',
+      },
+      hero: {
+        title: 'La page d\u2019accueil',
+        body: 'Le grand bandeau annonce nos trois activités : production, transformation et formation. Faites défiler pour découvrir nos gammes et nos engagements.',
+      },
+      homeProducts: {
+        title: 'Nos gammes de produits',
+        body: 'Champignons frais, champignons séchés, poudre, substrat de culture et engrais bio-organique. Chaque carte mène à la page Produits.',
+      },
+      products: {
+        title: 'La page Produits',
+        body: 'Le catalogue complet, filtrable par catégorie. Cliquez sur « Commander via WhatsApp » pour passer commande directement.',
+      },
+      sustainability: {
+        title: 'La page Durabilité',
+        body: 'Notre approche circulaire : le substrat usé de la récolte devient un engrais bio-organique. Rien ne se perd, tout se transforme.',
+      },
+      training: {
+        title: 'La page Formation',
+        body: 'Les formations que nous proposons aux jeunes, aux femmes et aux agriculteurs, de la préparation du substrat à la commercialisation.',
+      },
+      news: {
+        title: 'La page Actualités',
+        body: 'Les nouvelles de l\u2019entreprise et nos contenus éducatifs sur la myciculture. Cliquez sur un article pour le lire en entier.',
+      },
+      contactForm: {
+        title: 'Le formulaire de contact',
+        body: 'Votre visiteur laisse son nom, son téléphone et son message. Chaque envoi arrive dans l\u2019onglet Demandes de l\u2019administration.',
+      },
+      footerContact: {
+        title: 'Nos coordonnées',
+        body: 'Téléphone, WhatsApp, e-mail et adresse — visibles en bas de chaque page pour que l\u2019on vous joigne facilement.',
+      },
+      adminLogin: {
+        title: 'Connexion à l\u2019administration',
+        body: 'Saisissez ici votre code d\u2019accès pour ouvrir le tableau de bord. La session reste ouverte 12 heures.',
+      },
+      adminForgot: {
+        title: 'Code d\u2019accès oublié ?',
+        body: 'Ce lien ouvre le formulaire de récupération : votre code de secours plus un nouveau code d\u2019accès suffisent à revenir.',
+      },
+      adminBack: {
+        title: 'Retour au site public',
+        body: 'Ce lien referme l\u2019administration et vous ramène sur le site que voient vos visiteurs.',
+      },
+      adminHeader: {
+        title: 'Le tableau de bord',
+        body: 'En haut, le titre de l\u2019espace et, à droite, le retour au site public ainsi que la déconnexion.',
+      },
+      adminTabs: {
+        title: 'Les quatre onglets',
+        body: 'Demandes, Produits, Actualités et Contenu du site. Chaque onglet est indépendant : cliquez pour y accéder.',
+      },
+      adminInquiries: {
+        title: 'Onglet Demandes',
+        body: 'Les messages reçus via le formulaire de contact et le nombre de visites du site. Marquez une demande comme traitée quand vous y avez répondu.',
+      },
+      adminProducts: {
+        title: 'Onglet Produits',
+        body: 'Ajoutez, modifiez ou supprimez vos produits, avec photo, catégorie et prix. Les changements apparaissent immédiatement sur le site.',
+      },
+      adminNews: {
+        title: 'Onglet Actualités',
+        body: 'Rédigez et publiez vos articles. Séparez les paragraphes par une ligne vide.',
+      },
+      adminContent: {
+        title: 'Onglet Contenu du site',
+        body: 'Tous les textes et vos coordonnées, en version française et anglaise. Chaque groupe se sauvegarde séparément.',
+      },
+      adminSecurity: {
+        title: 'Sécurité et code de secours',
+        body: 'Changez votre code d\u2019accès et générez un code de secours. Conservez ce code hors de cet ordinateur : c\u2019est le seul moyen de revenir si vous oubliez votre code.',
+      },
+    },
   },
 };
 

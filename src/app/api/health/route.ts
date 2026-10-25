@@ -10,6 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getContentHealth } from '@/lib/cms-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,12 @@ export async function GET(req: Request) {
       payload.database = { status: 'error' };
       return NextResponse.json(payload, { status: 503, headers: { 'Cache-Control': 'no-store' } });
     }
+
+    // Informational: public pages may still be serving built-in fallback
+    // content even though this lightweight query succeeded. It does not change
+    // the status — a ready instance should stay in rotation — but a monitor
+    // alerting on this field catches "the site is up but showing wrong data".
+    payload.content = getContentHealth();
   }
 
   return NextResponse.json(payload, { status: 200, headers: { 'Cache-Control': 'no-store' } });

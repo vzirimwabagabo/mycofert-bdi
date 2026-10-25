@@ -7,6 +7,7 @@ import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
 import { InquiryForm } from './inquiry-form';
+import { imageSrc } from '@/lib/cms-defaults';
 
 export function TrainingPage() {
   const { t, lang } = useSite();
@@ -18,11 +19,11 @@ export function TrainingPage() {
       <PageHero title={pick(training.title, lang)} subtitle={pick(training.subtitle, lang)} />
 
       {/* Intro */}
-      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16" data-tour="training-intro">
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div className="overflow-hidden rounded-2xl">
             <img
-              src="/images/training.png"
+              src={imageSrc('training')}
               alt={pick(training.title, lang)}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"

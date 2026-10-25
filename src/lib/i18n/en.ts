@@ -335,6 +335,19 @@ export const en: Dict = {
     login: 'Sign in',
     logout: 'Sign out',
     wrongPasscode: 'Incorrect passcode.',
+    forgotPasscode: 'Forgot your passcode?',
+    recoverTitle: 'Recover access',
+    recoverIntro: 'Enter the recovery code you saved earlier, then choose a new passcode.',
+    recoveryCodeLabel: 'Recovery code',
+    recoveryCodePlaceholder: 'XXXX-XXXX-XXXX-XXXX',
+    resetPasscodeBtn: 'Reset passcode',
+    backToLogin: 'Back to sign in',
+    resetFailed: 'Could not reset the passcode.',
+    newRecoveryCodeTitle: 'Passcode reset',
+    newRecoveryCodeIntro: 'Here is your new recovery code. Write it down and keep it somewhere safe: it replaces the old one and will not be shown again.',
+    recoverySignInPrompt: 'You can now sign in with your new passcode.',
+    copy: 'Copy',
+    copied: 'Copied',
     statTotal: 'Total inquiries',
     statNew: 'New inquiries',
     statPageviews: 'Page views',
@@ -379,6 +392,8 @@ export const en: Dict = {
     hidden: 'Hidden',
     visibleLabel: 'Visible on the website',
     loading: 'Loading…',
+    loadError: 'Could not load the data. The database may be temporarily unavailable.',
+    retry: 'Retry',
     empty: 'Nothing here yet. Click "Add" to get started.',
     duplicateSlug: 'This identifier is already in use. Choose another one.',
     // Bilingual field helper
@@ -431,6 +446,7 @@ export const en: Dict = {
     heroBadgeLabel: 'Homepage hero badge',
     heroTitleLabel: 'Homepage main title',
     heroSubtitleLabel: 'Homepage subtitle',
+    heroImageLabel: 'Hero image',
     stat1Label: 'Statistic 1 caption',
     stat2Label: 'Statistic 2 caption',
     stat3Label: 'Statistic 3 caption',
@@ -444,5 +460,116 @@ export const en: Dict = {
     sustainTitleLabel: 'Title',
     sustainSubtitleLabel: 'Subtitle',
     cycleLabel: '"Circular agriculture" text',
+    // Security & passcode
+    groupSecurity: 'Security & Passcode',
+    securityIntro: 'Change the passcode required to access this admin panel. Stored as a salted cryptographic hash.',
+    currentPasscodeLabel: 'Current passcode',
+    newPasscodeLabel: 'New passcode (min. 12 characters)',
+    confirmPasscodeLabel: 'Confirm new passcode',
+    updatePasscodeBtn: 'Update passcode',
+    passcodeMismatch: 'New passcodes do not match.',
+    passcodeTooShort: 'New passcode must be at least 12 characters long.',
+    passcodeUpdated: 'Admin passcode updated successfully.',
+    passcodeUpdateError: 'Failed to update passcode. Ensure current passcode is correct.',
+    // Recovery code
+    recoveryGroupTitle: 'Recovery code',
+    recoveryIntro: 'If you forget your passcode, a recovery code is the only way back in. Generate one and keep it somewhere safe — on paper or in your phone, not only on this computer.',
+    recoveryRequiresPasscode: 'Enter your current passcode to generate a recovery code.',
+    recoveryGenerateBtn: 'Generate a recovery code',
+    recoveryGenerated: 'Recovery code generated',
+    recoveryShownOnce: 'Copy this code now. It is shown only once, and it replaces any previous recovery code.',
+    recoverySaved: 'I have saved it',
+    recoveryFailed: 'Could not generate a recovery code.',
+  },
+  // Guided tour (the "Guide" bubble, bottom-left). Step structure lives in
+  // src/components/site/tour-steps.ts; only the wording lives here.
+  tour: {
+    launch: 'Guide',
+    menuPublic: 'Tour of the public site',
+    menuAdmin: 'Tour of the admin area',
+    skip: 'Skip the tour',
+    prev: 'Back',
+    next: 'Next',
+    finish: 'Finish',
+    close: 'Close the tour',
+    counter: 'Step {n} of {total}',
+    steps: {
+      nav: {
+        title: 'The main menu',
+        body: 'Home, Products, About Us, Sustainability, Training, News and Contact. Open the language switcher on the right to move between French and English.',
+      },
+      hero: {
+        title: 'The homepage',
+        body: 'The large banner states our three activities: production, processing and training. Scroll on to discover our product lines and commitments.',
+      },
+      homeProducts: {
+        title: 'Our product lines',
+        body: 'Fresh mushrooms, dried mushrooms, powder, cultivation substrate and bio-organic fertilizer. Each card leads to the Products page.',
+      },
+      products: {
+        title: 'The Products page',
+        body: 'The full catalogue, filterable by category. Click "Order via WhatsApp" to place an order directly.',
+      },
+      sustainability: {
+        title: 'The Sustainability page',
+        body: 'Our circular approach: the spent substrate from a harvest becomes bio-organic fertilizer. Nothing is lost, everything is transformed.',
+      },
+      training: {
+        title: 'The Training page',
+        body: 'The courses we offer to young people, women and farmers, from substrate preparation through to marketing.',
+      },
+      news: {
+        title: 'The News page',
+        body: 'Company updates and our educational content on mushroom farming. Click an article to read it in full.',
+      },
+      contactForm: {
+        title: 'The contact form',
+        body: 'Your visitor leaves a name, a phone number and a message. Every submission arrives in the Inquiries tab of the admin area.',
+      },
+      footerContact: {
+        title: 'Our contact details',
+        body: 'Phone, WhatsApp, email and address — visible at the bottom of every page so you are easy to reach.',
+      },
+      adminLogin: {
+        title: 'Signing in to the admin area',
+        body: 'Enter your passcode here to open the dashboard. A session stays open for 12 hours.',
+      },
+      adminForgot: {
+        title: 'Forgotten your passcode?',
+        body: 'This link opens the recovery form: your recovery code plus a new passcode is enough to get back in.',
+      },
+      adminBack: {
+        title: 'Back to the public site',
+        body: 'This link leaves the admin area and returns you to the site your visitors see.',
+      },
+      adminHeader: {
+        title: 'The dashboard',
+        body: 'At the top, the name of the area, and on the right the link back to the public site and the sign-out button.',
+      },
+      adminTabs: {
+        title: 'The four tabs',
+        body: 'Inquiries, Products, News and Site content. Each tab is independent — click one to open it.',
+      },
+      adminInquiries: {
+        title: 'Inquiries tab',
+        body: 'Messages received through the contact form, plus the site visit count. Mark an inquiry as handled once you have replied.',
+      },
+      adminProducts: {
+        title: 'Products tab',
+        body: 'Add, edit or delete your products, with a photo, a category and a price. Changes appear on the site immediately.',
+      },
+      adminNews: {
+        title: 'News tab',
+        body: 'Write and publish your articles. Separate paragraphs with an empty line.',
+      },
+      adminContent: {
+        title: 'Site content tab',
+        body: 'All the website texts and your contact details, in both French and English. Each group is saved on its own.',
+      },
+      adminSecurity: {
+        title: 'Security and recovery code',
+        body: 'Change your passcode and generate a recovery code. Keep that code off this computer — it is the only way back if you forget your passcode.',
+      },
+    },
   },
 };

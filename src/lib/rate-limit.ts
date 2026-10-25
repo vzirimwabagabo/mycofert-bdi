@@ -6,6 +6,12 @@
 // state (Redis). When REDIS_URL is absent — local development, or a
 // single-instance deploy — it falls back to an in-process store and logs a
 // warning in production, because the fallback is NOT correct behind a LB.
+//
+// Failure semantics are per-policy:
+//   * Public endpoints (inquiries, track) fail OPEN on a store outage — the
+//     marketing site staying up matters more than perfect limits.
+//   * The admin login endpoint fails CLOSED — an outage must not silently
+//     re-enable unlimited passcode brute force.
 
 import { NextRequest } from 'next/server';
 
@@ -24,6 +30,18 @@ export interface RateLimitOptions {
   key: string;
   limit: number;
   windowSeconds: number;
+  /**
+   * Cap used when the client IP is unknown (no trusted proxy configured).
+   * Without this, all anonymous visitors share ONE bucket; a limit tuned for
+   * a single abusive client would then throttle the entire site.
+   */
+  unknownLimit?: number;
+  /**
+   * Fail CLOSED when the shared store errors. Use for security-critical
+   * endpoints (admin login) where availability is less important than
+   * keeping the brute-force bound.
+   */
+  failClosed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,43 +49,46 @@ export interface RateLimitOptions {
 // ---------------------------------------------------------------------------
 
 interface Store {
-  readonly kind: 'redis' | 'memory' | 'noop';
+  readonly kind: 'redis' | 'memory';
+  /** Increment the counter for this bucket; returns the new count. */
   hit(key: string, windowSeconds: number): Promise<number>;
-  ttl(key: string): Promise<number>;
 }
 
-/** In-process fixed-window counter. Correct only for a single instance. */
+/**
+ * Fixed-window counter. The reset time is derived from the key's window
+ * index, so no TTL round-trip is needed and the window never slides.
+ */
 class MemoryStore implements Store {
   readonly kind = 'memory' as const;
-  private buckets = new Map<string, { count: number; resetAt: number }>();
+  private buckets = new Map<string, { count: number; window: number }>();
   private lastSweep = 0;
 
   async hit(key: string, windowSeconds: number): Promise<number> {
     const now = Date.now();
     // Opportunistic sweep so long-running processes do not leak memory.
     if (now - this.lastSweep > 60_000) {
-      for (const [k, v] of this.buckets) if (v.resetAt <= now) this.buckets.delete(k);
+      const currentWindow = Math.floor(now / (windowSeconds * 1000));
+      for (const [k, v] of this.buckets) if (v.window < currentWindow) this.buckets.delete(k);
       this.lastSweep = now;
     }
+    // The sweep above uses the *current call's* window length, which can
+    // leave stale entries of other durations behind; check per-key too.
+    const windowIndex = Math.floor(now / (windowSeconds * 1000));
     const existing = this.buckets.get(key);
-    if (!existing || existing.resetAt <= now) {
-      this.buckets.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    if (!existing || existing.window !== windowIndex) {
+      this.buckets.set(key, { count: 1, window: windowIndex });
       return 1;
     }
     existing.count += 1;
     return existing.count;
   }
-
-  async ttl(key: string): Promise<number> {
-    const b = this.buckets.get(key);
-    return b ? Math.max(0, Math.ceil((b.resetAt - Date.now()) / 1000)) : 0;
-  }
 }
 
 /**
  * Redis fixed-window counter using the REST API (Upstash-compatible), so no
- * extra npm dependency is required. Works with any Redis that exposes the
- * HTTP command endpoint, e.g. Upstash or self-hosted with a proxy.
+ * extra npm dependency is required. INCR and EXPIRE are sent as one pipeline
+ * (EXPIRE with the NX flag applies the TTL only on first increment), which
+ * is both atomic-enough and a single round trip.
  */
 class RedisStore implements Store {
   readonly kind = 'redis' as const;
@@ -76,46 +97,40 @@ class RedisStore implements Store {
     private token: string
   ) {}
 
-  private async command(args: (string | number)[]): Promise<unknown> {
-    const res = await fetch(this.url, {
+  /** Run a pipeline of commands; returns one result per command. */
+  private async pipeline(commands: (string | number)[][]): Promise<unknown[]> {
+    const endpoint = this.url.endsWith('/pipeline') ? this.url : `${this.url}/pipeline`;
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(args),
+      body: JSON.stringify(commands),
       // Never let a slow cache turn into an outage of the endpoint.
       signal: AbortSignal.timeout(1500),
       cache: 'no-store',
     });
     if (!res.ok) throw new Error(`redis ${res.status}`);
-    return (await res.json()) as unknown;
+    const body = (await res.json()) as unknown;
+    if (!Array.isArray(body)) throw new Error('redis: non-pipeline response');
+    return body;
   }
 
   async hit(key: string, windowSeconds: number): Promise<number> {
-    const count = await this.command(['INCR', key]);
+    const results = await this.pipeline([
+      ['INCR', key],
+      // "NX": only set TTL if none exists, so the window does not slide.
+      ['EXPIRE', key, windowSeconds, 'NX'],
+    ]);
+    const first = results[0];
+    const count =
+      first && typeof first === 'object' && 'result' in first
+        ? (first as { result: unknown }).result
+        : first;
     const n = typeof count === 'number' ? count : Number(count);
     if (!Number.isFinite(n)) throw new Error('redis: bad INCR result');
-    // Set the TTL only on the first hit, so the window does not slide.
-    if (n === 1) await this.command(['EXPIRE', key, windowSeconds]);
     return n;
-  }
-
-  async ttl(key: string): Promise<number> {
-    const t = await this.command(['TTL', key]);
-    const n = typeof t === 'number' ? t : Number(t);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  }
-}
-
-/** Used when rate limiting cannot be enforced; fails open but logs loudly. */
-class NoopStore implements Store {
-  readonly kind = 'noop' as const;
-  async hit(): Promise<number> {
-    return 1;
-  }
-  async ttl(): Promise<number> {
-    return 0;
   }
 }
 
@@ -145,7 +160,7 @@ function getStore(): Store {
     );
   }
 
-  cachedStore = process.env.NODE_ENV === 'production' ? new MemoryStore() : new MemoryStore();
+  cachedStore = new MemoryStore();
   return cachedStore;
 }
 
@@ -158,8 +173,13 @@ function getStore(): Store {
  *
  * Trusting X-Forwarded-For blindly lets a client spoof its own identity and
  * bypass rate limits, so we only read it when TRUST_PROXY=1 (i.e. we know a
- * load balancer we control sits in front and overwrites the header). The
- * left-most entry is used, which is the convention for the original client.
+ * load balancer we control sits in front and overwrites the header — the
+ * bundled Caddyfile does exactly that). The left-most entry is the
+ * convention for the original client.
+ *
+ * When no proxy is trusted we cannot see the socket address through
+ * NextRequest, so callers get 'unknown'. Policies define an unknownLimit so
+ * that case degrades to a generous shared cap instead of a site-wide throttle.
  */
 export function getClientIp(req: NextRequest): string {
   const trustProxy = process.env.TRUST_PROXY === '1';
@@ -174,10 +194,6 @@ export function getClientIp(req: NextRequest): string {
     if (realIp) return realIp.trim();
   }
 
-  // Next.js does not expose the socket address on NextRequest in all runtimes;
-  // when unavailable we fall back to a constant bucket. That is deliberately
-  // conservative: it rate-limits globally rather than allowing anonymous
-  // clients to evade the limit, and TRUST_PROXY should be set in production.
   return 'unknown';
 }
 
@@ -185,39 +201,57 @@ export function getClientIp(req: NextRequest): string {
 // Public API
 // ---------------------------------------------------------------------------
 
-function bucketKey(opts: RateLimitOptions, identity: string): string {
-  const window = Math.floor(Date.now() / (opts.windowSeconds * 1000));
-  return `rl:${opts.key}:${identity}:${window}`;
+function windowIndexAndReset(windowSeconds: number): { index: number; resetAt: number } {
+  const index = Math.floor(Date.now() / (windowSeconds * 1000));
+  return { index, resetAt: (index + 1) * windowSeconds * 1000 };
+}
+
+function bucketKey(opts: RateLimitOptions, identity: string, windowIndex: number): string {
+  return `rl:${opts.key}:${identity}:${windowIndex}`;
 }
 
 /**
  * Consume one unit from the bucket for `identity`.
- * Fails open if the shared store is unreachable — availability of the public
- * site is preferred over strict limiting — but logs the failure.
+ * Fails open (availability first) unless the policy sets failClosed.
  */
 export async function rateLimit(
   opts: RateLimitOptions,
   identity: string
 ): Promise<RateLimitResult> {
   const store = getStore();
-  const key = bucketKey(opts, identity);
+  const effectiveLimit = identity === 'unknown' && opts.unknownLimit ? opts.unknownLimit : opts.limit;
+  const { index, resetAt } = windowIndexAndReset(opts.windowSeconds);
+  const key = bucketKey(opts, identity, index);
 
   try {
     const count = await store.hit(key, opts.windowSeconds);
-    const ttl = await store.ttl(key);
-    const remaining = Math.max(0, opts.limit - count);
+    const remaining = Math.max(0, effectiveLimit - count);
     return {
-      allowed: count <= opts.limit,
-      limit: opts.limit,
+      allowed: count <= effectiveLimit,
+      limit: effectiveLimit,
       remaining,
-      resetAt: Date.now() + ttl * 1000,
-      retryAfter: count > opts.limit ? Math.max(1, ttl) : 0,
+      resetAt,
+      retryAfter: count > effectiveLimit ? Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)) : 0,
     };
   } catch (error) {
+    if (opts.failClosed) {
+      console.error('[rate-limit] store failure, failing CLOSED per policy:', error);
+      return {
+        allowed: false,
+        limit: effectiveLimit,
+        remaining: 0,
+        resetAt,
+        retryAfter: Math.max(1, Math.ceil((resetAt - Date.now()) / 1000)),
+      };
+    }
     console.error('[rate-limit] store failure, failing open:', error);
-    const noop = new NoopStore();
-    void noop;
-    return { allowed: true, limit: opts.limit, remaining: opts.limit, resetAt: Date.now(), retryAfter: 0 };
+    return {
+      allowed: true,
+      limit: effectiveLimit,
+      remaining: effectiveLimit,
+      resetAt,
+      retryAfter: 0,
+    };
   }
 }
 
@@ -244,18 +278,26 @@ export function rateLimitHeaders(result: RateLimitResult): Record<string, string
 // Named policies
 // ---------------------------------------------------------------------------
 
-/** Login attempts: tight, because a passcode is the only factor. */
+/** Login attempts: tight, because a passcode is the only factor. Fails closed. */
 export const LIMIT_ADMIN_AUTH: RateLimitOptions = {
   key: 'admin-auth',
-  limit: 8,
+  limit: process.env.NODE_ENV === 'production' ? 8 : 60,
   windowSeconds: 15 * 60,
+  // Without a trusted proxy every caller shares one bucket — a strict global
+  // login cap is exactly what we want under attack, so no unknownLimit here.
+  failClosed: true,
 };
 
-/** Public inquiry submissions: generous for humans, hostile to scripts. */
+/**
+ * Public inquiry submissions: generous for humans, hostile to scripts.
+ * When the client IP is unknown, the cap is raised so one abusive client
+ * cannot consume the submissions budget of every other visitor.
+ */
 export const LIMIT_INQUIRIES: RateLimitOptions = {
   key: 'inquiries',
   limit: 10,
   windowSeconds: 10 * 60,
+  unknownLimit: 60,
 };
 
 /** Analytics beacon: pages are cheap, but a loop must not grow the table. */
@@ -263,6 +305,7 @@ export const LIMIT_TRACK: RateLimitOptions = {
   key: 'track',
   limit: 120,
   windowSeconds: 5 * 60,
+  unknownLimit: 3000,
 };
 
 /** Authenticated admin reads. */
@@ -270,4 +313,5 @@ export const LIMIT_ADMIN_API: RateLimitOptions = {
   key: 'admin-api',
   limit: 300,
   windowSeconds: 5 * 60,
+  unknownLimit: 1200,
 };

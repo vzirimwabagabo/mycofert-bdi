@@ -5,10 +5,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
+import { isTransientDbError } from '@/lib/db-retry';
 import { getAdminContent, newsDto, productDto } from '@/lib/cms-server';
 import { IMAGE_LIBRARY, SETTING_KEYS, slugify } from '@/lib/cms-defaults';
 import { ADMIN_TOKEN_HEADER, verifyRequest } from '@/lib/auth';
 import { LIMIT_ADMIN_API, rateLimitRequest, rateLimitHeaders } from '@/lib/rate-limit';
+import { isAllowedImageUrl } from '@/lib/image-url';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Authorise an admin request, with rate limiting.
@@ -56,8 +60,24 @@ function imageKey(v: unknown, fallback: string): string {
   return (IMAGE_LIBRARY as readonly string[]).includes(candidate) ? candidate : fallback;
 }
 
+/**
+ * Uploaded image URL. Only https URLs on the object-storage public base (or a
+ * legacy res.cloudinary.com URL) are accepted — that is exactly what the CSP
+ * img-src allows and what the upload flow produces, so a stored URL can never
+ * point at an arbitrary host.
+ * undefined = field absent, null/'' = cleared.
+ */
+function imageUrlField(v: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  if (typeof v !== 'string') return { ok: false };
+  const s = v.trim().slice(0, 1000);
+  if (!s) return { ok: true, value: null };
+  if (!isAllowedImageUrl(s)) return { ok: false };
+  return { ok: true, value: s };
+}
+
 /** Build a Prisma update payload from a partial product form object. */
-function productUpdateData(d: Record<string, unknown>): Prisma.ProductUpdateInput {
+function productUpdateData(d: Record<string, unknown>, imageUrl?: string | null): Prisma.ProductUpdateInput {
   const data: Prisma.ProductUpdateInput = {};
   const slug = slugify(str(d.slug, 60));
   if (slug) data.slug = slug;
@@ -82,11 +102,12 @@ function productUpdateData(d: Record<string, unknown>): Prisma.ProductUpdateInpu
   if (typeof d.pointsEn === 'string') data.pointsEn = str(d.pointsEn, 5000);
   if (typeof d.formatsFr === 'string') data.formatsFr = str(d.formatsFr, 500);
   if (typeof d.formatsEn === 'string') data.formatsEn = str(d.formatsEn, 500);
+  if (imageUrl !== undefined) data.imageUrl = imageUrl;
   return data;
 }
 
 /** Build a Prisma update payload from a partial news form object. */
-function newsUpdateData(d: Record<string, unknown>): Prisma.NewsPostUpdateInput {
+function newsUpdateData(d: Record<string, unknown>, imageUrl?: string | null): Prisma.NewsPostUpdateInput {
   const data: Prisma.NewsPostUpdateInput = {};
   const slug = slugify(str(d.slug, 60));
   if (slug) data.slug = slug;
@@ -106,6 +127,7 @@ function newsUpdateData(d: Record<string, unknown>): Prisma.NewsPostUpdateInput 
   if (typeof d.excerptEn === 'string') data.excerptEn = str(d.excerptEn, 1000);
   if (typeof d.bodyFr === 'string') data.bodyFr = str(d.bodyFr, 40000);
   if (typeof d.bodyEn === 'string') data.bodyEn = str(d.bodyEn, 40000);
+  if (imageUrl !== undefined) data.imageUrl = imageUrl;
   return data;
 }
 
@@ -118,6 +140,13 @@ export async function GET(req: NextRequest) {
     const content = await getAdminContent();
     return NextResponse.json(content, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
+    if (isTransientDbError(error)) {
+      console.error('[api/admin/content] GET: database temporarily unavailable:', error);
+      return NextResponse.json(
+        { error: 'The database is temporarily unavailable. Please retry.', code: 'DB_UNAVAILABLE' },
+        { status: 503, headers: { 'Retry-After': '5', 'X-Db-Unavailable': '1' } }
+      );
+    }
     console.error('[api/admin/content] GET failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -140,6 +169,10 @@ export async function POST(req: NextRequest) {
       if (!slug) {
         return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
       }
+      const img = imageUrlField(d.imageUrl);
+      if (!img.ok) {
+        return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+      }
       const created = await db.product.create({
         data: {
           slug,
@@ -147,6 +180,7 @@ export async function POST(req: NextRequest) {
             typeof d.sortOrder === 'number' && Number.isFinite(d.sortOrder) ? Math.trunc(d.sortOrder) : 0,
           published: d.published !== false,
           imageKey: imageKey(d.imageKey, 'fresh'),
+          imageUrl: img.value,
           nameFr,
           nameEn: str(d.nameEn, 200) || nameFr,
           taglineFr: str(d.taglineFr, 300),
@@ -171,11 +205,16 @@ export async function POST(req: NextRequest) {
       if (!slug) {
         return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
       }
+      const img = imageUrlField(d.imageUrl);
+      if (!img.ok) {
+        return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+      }
       const created = await db.newsPost.create({
         data: {
           slug,
           published: d.published !== false,
           imageKey: imageKey(d.imageKey, 'training'),
+          imageUrl: img.value,
           dateFr: str(d.dateFr, 60),
           dateEn: str(d.dateEn, 60),
           titleFr,
@@ -213,13 +252,17 @@ export async function PATCH(req: NextRequest) {
 
     if (kind === 'product') {
       if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-      await db.product.update({ where: { id }, data: productUpdateData(d) });
+      const img = imageUrlField(d.imageUrl);
+      if (!img.ok) return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+      await db.product.update({ where: { id }, data: productUpdateData(d, img.value) });
       return NextResponse.json({ ok: true });
     }
 
     if (kind === 'news') {
       if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-      await db.newsPost.update({ where: { id }, data: newsUpdateData(d) });
+      const img = imageUrlField(d.imageUrl);
+      if (!img.ok) return NextResponse.json({ error: 'Invalid image URL' }, { status: 400 });
+      await db.newsPost.update({ where: { id }, data: newsUpdateData(d, img.value) });
       return NextResponse.json({ ok: true });
     }
 
@@ -228,6 +271,14 @@ export async function PATCH(req: NextRequest) {
       const value = body.value;
       if (!(SETTING_KEYS as string[]).includes(key) || !value || typeof value !== 'object' || Array.isArray(value)) {
         return NextResponse.json({ error: 'Invalid setting payload' }, { status: 400 });
+      }
+      // settings.home.heroImage is rendered as an <img src> on every page
+      // load, so it must obey the same Cloudinary-only rule as item images.
+      if (key === 'home') {
+        const heroImage = (value as Record<string, unknown>).heroImage;
+        if (typeof heroImage === 'string' && heroImage.trim() !== '' && !isAllowedImageUrl(heroImage.trim())) {
+          return NextResponse.json({ error: 'Invalid hero image URL' }, { status: 400 });
+        }
       }
       await db.siteSetting.upsert({
         where: { key },

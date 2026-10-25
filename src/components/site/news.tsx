@@ -9,7 +9,7 @@ import {
 import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { PageHero } from './bits';
-import { imageSrc } from '@/lib/cms-defaults';
+import { resolveImage } from '@/lib/cms-defaults';
 import { ArrowLeft, CalendarDays, Newspaper } from 'lucide-react';
 
 export function NewsPage() {
@@ -21,7 +21,7 @@ export function NewsPage() {
     <div>
       <PageHero title={t.news.title} subtitle={t.news.subtitle} />
 
-      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16" data-tour="news-list">
         {news.length === 0 ? (
           <p className="py-16 text-center text-muted-foreground">{t.admin.noData}</p>
         ) : (
@@ -30,7 +30,7 @@ export function NewsPage() {
               <Card key={post.id} className="flex flex-col overflow-hidden border-border/70 transition-shadow hover:shadow-md">
                 <div className="aspect-[16/9] bg-secondary">
                   <img
-                    src={imageSrc(post.imageKey)}
+                    src={resolveImage(post)}
                     alt=""
                     aria-hidden="true"
                     loading="lazy"
@@ -93,7 +93,7 @@ export function NewsPostPage({ slug }: { slug?: string }) {
 
       <article className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
         <div className="overflow-hidden rounded-2xl">
-          <img src={imageSrc(post.imageKey)} alt="" aria-hidden="true" className="aspect-[16/9] w-full object-cover" />
+          <img src={resolveImage(post)} alt="" aria-hidden="true" className="aspect-[16/9] w-full object-cover" />
         </div>
         <div className="mt-8 space-y-5">
           {post.body[lang].map((p, i) => (

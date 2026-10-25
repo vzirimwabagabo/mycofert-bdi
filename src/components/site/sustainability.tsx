@@ -6,6 +6,7 @@ import { Recycle, ArrowDown, Package, Sprout, ShoppingBasket } from 'lucide-reac
 import { useSite } from './context';
 import { useCms, pick } from './cms';
 import { PageHero, SectionHeading } from './bits';
+import { imageSrc } from '@/lib/cms-defaults';
 
 const STEP_ICONS = [Package, Sprout, ShoppingBasket, Recycle];
 
@@ -49,11 +50,11 @@ export function SustainabilityPage() {
       </section>
 
       {/* Circular cycle */}
-      <section className="bg-secondary/60 py-14 sm:py-16">
+      <section className="bg-secondary/60 py-14 sm:py-16" data-tour="sustainability-intro">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-2">
           <div className="overflow-hidden rounded-2xl">
             <img
-              src="/images/sustainability.png"
+              src={imageSrc('sustainability')}
               alt={t.sustainability.cycleTitle}
               loading="lazy"
               className="aspect-[4/3] w-full object-cover"

@@ -78,7 +78,7 @@ export function Footer() {
           </ul>
         </nav>
 
-        <div>
+        <div data-tour="footer-contact">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">{t.footer.contactCol}</h3>
           <ul className="space-y-3 text-sm">
             <li className="flex items-start gap-2">
@@ -123,7 +123,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-4 text-xs text-white/60 sm:flex-row sm:px-6">
         <p>© {year} MYCOFERT Burundi. {t.footer.rights}</p>
         <a
-          href="#/admin"
+          href={hrefFor(lang, 'admin')}
           onClick={(e) => {
             e.preventDefault();
             navigate('admin');

@@ -12,22 +12,24 @@ const logLevels: ('query' | 'warn' | 'error')[] =
     ? ['error']
     : ['warn', 'error']
 
+// DATABASE_URL already carries connection_limit=1 for PgBouncer / Neon pooler.
+// DATABASE_CONNECTION_LIMIT is only used for direct (non-pooler) connections
+// where the URL does not already include a limit.
+const databaseUrl = process.env.DATABASE_URL ?? '';
+const isPoolerUrl = databaseUrl.includes('pgbouncer=true') || databaseUrl.includes('connection_limit=');
+
+function buildUrl(): string {
+  if (!databaseUrl) return databaseUrl;
+  if (isPoolerUrl) return databaseUrl; // limit already encoded in URL
+  const limit = process.env.DATABASE_CONNECTION_LIMIT;
+  return limit ? appendParam(databaseUrl, 'connection_limit', limit) : databaseUrl;
+}
+
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: logLevels,
-    // Connection pool sizing matters behind a load balancer: each instance
-    // holds its own pool, so N instances × connection_limit must stay under
-    // the database's max_connections. Override via DATABASE_CONNECTION_LIMIT.
-    ...(process.env.DATABASE_CONNECTION_LIMIT
-      ? {
-          datasources: {
-            db: {
-              url: appendParam(process.env.DATABASE_URL ?? '', 'connection_limit', process.env.DATABASE_CONNECTION_LIMIT),
-            },
-          },
-        }
-      : {}),
+    datasources: { db: { url: buildUrl() } },
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

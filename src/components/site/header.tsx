@@ -54,7 +54,7 @@ export function Header() {
           <Wordmark />
         </button>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
+        <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation" data-tour="nav">
           {NAV.map((item) => (
             <button
               key={item.page}
@@ -83,7 +83,14 @@ export function Header() {
 
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="lg:hidden" aria-label="Menu">
+              <Button
+                id="mobile-nav-trigger"
+                variant="outline"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Menu"
+                suppressHydrationWarning
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -129,7 +136,14 @@ export function LangSwitch({ lang, setLang }: { lang: Lang; setLang: (l: Lang) =
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" aria-label={t.common.langLabel}>
+        <Button
+          id="lang-switch-trigger"
+          variant="outline"
+          size="sm"
+          className="gap-2"
+          aria-label={t.common.langLabel}
+          suppressHydrationWarning
+        >
           <Globe className="h-4 w-4" aria-hidden="true" />
           <span className="uppercase">{lang}</span>
         </Button>
