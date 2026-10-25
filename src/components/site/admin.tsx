@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSite } from './context';
-import { useTour } from './tour';
+import { useTour, notifyAuthChange } from './tour';
 import type { AdminTab } from './tour-steps';
 import { authHeaders, type AdminContent } from './admin-ui';
 import { InquiriesPanel } from './admin-inquiries';
@@ -79,7 +79,7 @@ function PanelFallback({
 
 export function AdminPage() {
   const { t, lang, navigate } = useSite();
-  const { tab: tourTab, start: startTour } = useTour();
+  const { active: activeTour, tab: tourTab, start: startTour, stop: stopTour } = useTour();
   const [mounted, setMounted] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [passcode, setPasscode] = useState('');
@@ -112,9 +112,9 @@ export function AdminPage() {
     if (tourTab) setActiveTab(tourTab);
   }, [tourTab]);
 
-  // Auto-start admin tour once the passcode is entered and user is let in (first-time only)
+  // Auto-start admin tour strictly once passcode is verified, content is loaded, and admin is let in
   useEffect(() => {
-    if (!token) return;
+    if (!token || !content) return;
     try {
       const seen = window.localStorage.getItem('mycofert_admin_tour_seen');
       if (!seen) {
@@ -127,7 +127,14 @@ export function AdminPage() {
     } catch {
       // Ignore storage access errors
     }
-  }, [token, startTour]);
+  }, [token, content, startTour]);
+
+  // Immediately cancel any active admin tour if the user is unauthenticated
+  useEffect(() => {
+    if ((!token || !content) && activeTour === 'admin') {
+      stopTour();
+    }
+  }, [token, content, activeTour, stopTour]);
 
   /**
    * Central reaction to an API response.
@@ -144,16 +151,18 @@ export function AdminPage() {
     if (res.headers.get('X-Db-Unavailable')) return false;
     if (res.status !== 401 && res.status !== 503) return false;
     window.sessionStorage.removeItem('mycofert-admin-token');
+    notifyAuthChange();
     setToken(null);
     setContent(null);
     setAuthError(false);
+    stopTour();
     setAuthNotice(
       res.status === 503
         ? 'Admin authentication is not configured on the server.'
         : 'Your session has expired. Please sign in again.'
     );
     return true;
-  }, []);
+  }, [stopTour]);
 
   const loadContent = useCallback(
     async (tok: string) => {
@@ -193,6 +202,7 @@ export function AdminPage() {
       if (res.ok) {
         const { token: tok } = await res.json();
         window.sessionStorage.setItem('mycofert-admin-token', tok);
+        notifyAuthChange();
         setToken(tok);
         setPasscode('');
       } else if (res.status === 503) {
@@ -209,9 +219,11 @@ export function AdminPage() {
 
   function logout() {
     window.sessionStorage.removeItem('mycofert-admin-token');
+    notifyAuthChange();
     setToken(null);
     setContent(null);
     setPasscode('');
+    stopTour();
   }
 
   /**

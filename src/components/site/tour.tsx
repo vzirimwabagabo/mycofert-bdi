@@ -366,6 +366,13 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const tab = step?.tab ?? null;
 
   const start = useCallback((id: TourId) => {
+    // Strictly disallow unauthenticated users from launching the admin tour
+    if (id === 'admin' || id === 'admin-login') {
+      const hasToken = typeof window !== 'undefined' && Boolean(window.sessionStorage.getItem(TOKEN_KEY));
+      if (!hasToken) {
+        return;
+      }
+    }
     setIndex(0);
     setActive(id);
   }, []);
@@ -388,9 +395,21 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+export const AUTH_CHANGE_EVENT = 'mycofert-auth-change';
+
+export function notifyAuthChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT));
+  }
+}
+
 function subscribeToSession(callback: () => void) {
   window.addEventListener('storage', callback);
-  return () => window.removeEventListener('storage', callback);
+  window.addEventListener(AUTH_CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(AUTH_CHANGE_EVENT, callback);
+  };
 }
 
 function getSessionSnapshot(): boolean {
@@ -465,31 +484,44 @@ export function TourButton() {
 export function TourLauncher() {
   const { t, route, navigate } = useSite();
   const { start } = useTour();
+  const signedIn = useSyncExternalStore(subscribeToSession, getSessionSnapshot, getServerSnapshot);
 
   const startAdmin = () => {
-    // Two different admin tours: the passcode screen and the signed-in
-    // dashboard share no anchors, so the choice is made at click time.
-    const signedIn = Boolean(window.sessionStorage.getItem(TOKEN_KEY));
+    if (!signedIn) return;
     if (route.page !== 'admin') navigate('admin');
-    start(signedIn ? 'admin' : 'admin-login');
+    start('admin');
   };
 
+  if (signedIn) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            className="fixed bottom-5 left-5 z-40 h-12 gap-2 rounded-full bg-background/95 px-4 shadow-lg"
+            aria-label={t.tour.launch}
+          >
+            <Compass className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+            <span className="text-sm font-semibold">{t.tour.launch}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="top" className="w-64">
+          <DropdownMenuItem onClick={() => start('public')}>{t.tour.menuPublic}</DropdownMenuItem>
+          <DropdownMenuItem onClick={startAdmin}>{t.tour.menuAdmin}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          className="fixed bottom-5 left-5 z-40 h-12 gap-2 rounded-full bg-background/95 px-4 shadow-lg"
-          aria-label={t.tour.launch}
-        >
-          <Compass className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
-          <span className="text-sm font-semibold">{t.tour.launch}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" side="top" className="w-64">
-        <DropdownMenuItem onClick={() => start('public')}>{t.tour.menuPublic}</DropdownMenuItem>
-        <DropdownMenuItem onClick={startAdmin}>{t.tour.menuAdmin}</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      variant="outline"
+      className="fixed bottom-5 left-5 z-40 h-12 gap-2 rounded-full bg-background/95 px-4 shadow-lg"
+      onClick={() => start('public')}
+      aria-label={t.tour.launch}
+    >
+      <Compass className="h-5 w-5 text-[#2F6B3F]" aria-hidden="true" />
+      <span className="text-sm font-semibold">{t.tour.launch}</span>
+    </Button>
   );
 }

@@ -47,13 +47,8 @@ export const TOURS: Record<TourId, TourStep[]> = {
     { key: 'footerContact', anchor: 'footer-contact', page: 'contact', placement: 'top' },
   ],
 
-  // Shown on the passcode screen, so it stops there: the dashboard steps would
-  // have nothing to point at until someone is signed in.
-  'admin-login': [
-    { key: 'adminLogin', anchor: 'admin-login', page: 'admin' },
-    { key: 'adminForgot', anchor: 'admin-forgot', placement: 'top' },
-    { key: 'adminBack', anchor: 'admin-back', placement: 'top' },
-  ],
+  // Admin tour happens only after authenticated into dashboard; no tour on passcode screen.
+  'admin-login': [],
 
   admin: [
     { key: 'adminHeader', anchor: 'admin-header' },
