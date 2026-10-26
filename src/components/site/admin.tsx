@@ -19,7 +19,7 @@ import { InquiriesPanel } from './admin-inquiries';
 import { ProductsPanel } from './admin-products';
 import { NewsPanel } from './admin-news';
 import { SettingsPanel } from './admin-settings';
-import { LayoutGrid, Lock, LogOut, Newspaper, Package, Users } from 'lucide-react';
+import { Eye, EyeOff, LayoutGrid, Lock, LogOut, Newspaper, Package, Users } from 'lucide-react';
 
 /**
  * Skeleton shaped like the panels below (a title bar plus a stack of card
@@ -83,6 +83,7 @@ export function AdminPage() {
   const [mounted, setMounted] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [passcode, setPasscode] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [content, setContent] = useState<AdminContent | null>(null);
@@ -381,14 +382,39 @@ export function AdminPage() {
               <form onSubmit={login} className="mt-6 space-y-4" suppressHydrationWarning>
                 <div className="space-y-2" data-tour="admin-login">
                   <Label htmlFor="admin-pass" suppressHydrationWarning>{t.admin.passcode}</Label>
-                  <Input
-                    id="admin-pass"
-                    type="password"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                    placeholder={t.admin.passcodePlaceholder}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="admin-pass"
+                      type={showPasscode ? 'text' : 'password'}
+                      value={passcode}
+                      onChange={(e) => setPasscode(e.target.value)}
+                      placeholder={t.admin.passcodePlaceholder}
+                      autoComplete="current-password"
+                      className="pr-11"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasscode((visible) => !visible)}
+                      aria-label={
+                        showPasscode
+                          ? lang === 'en'
+                            ? 'Hide passcode'
+                            : 'Masquer le code d’accès'
+                          : lang === 'en'
+                            ? 'Show passcode'
+                            : 'Afficher le code d’accès'
+                      }
+                      aria-pressed={showPasscode}
+                      className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {showPasscode ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                   {authError ? <p className="text-xs text-destructive">{t.admin.wrongPasscode}</p> : null}
                   {authNotice ? <p className="text-xs text-destructive">{authNotice}</p> : null}
                 </div>
