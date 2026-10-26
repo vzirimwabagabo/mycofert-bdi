@@ -78,6 +78,10 @@ export function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
+  // Pass the URL language into the root layout so the first server-rendered
+  // HTML has the right lang attribute before React hydrates.
+  const firstPathSegment = request.nextUrl.pathname.split('/').filter(Boolean)[0];
+  requestHeaders.set('x-site-lang', firstPathSegment === 'en' ? 'en' : 'fr');
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);

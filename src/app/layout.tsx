@@ -66,10 +66,12 @@ export default async function RootLayout({
   // Read the nonce injected by the CSP middleware so it can be passed to
   // Next.js font/script elements — without it the browser blocks those
   // inline resources under the nonce-based policy.
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const requestHeaders = await headers();
+  const nonce = requestHeaders.get("x-nonce") ?? undefined;
+  const htmlLang = requestHeaders.get("x-site-lang") === "en" ? "en" : "fr";
 
   return (
-    <html lang="fr" translate="no" className="notranslate" suppressHydrationWarning>
+    <html lang={htmlLang} translate="no" className="notranslate" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground notranslate`}
         translate="no"

@@ -56,8 +56,10 @@ Design constraints that shaped everything below:
 
 1. **`proxy.ts`** runs first on every matching request. It generates a fresh 16-byte nonce, builds a
    nonce-based `Content-Security-Policy`, attaches it to both the request headers (as `x-nonce`, so
-   `layout.tsx` can stamp Next.js' script tags) and the response. Prefetch requests are excluded via
-   the matcher's `missing` conditions.
+   `layout.tsx` can stamp Next.js' script tags) and the response. It also derives `x-site-lang` from
+   the first path segment (`en` or `fr`, defaulting to `fr`) so `layout.tsx` can render the matching
+   `<html lang>` attribute in the initial response. Prefetch requests are excluded via the matcher's
+   `missing` conditions.
 2. **Route parsing.** The page reads the `slug` params and calls `routeFromParams()` →
    `parseSegments()` from `src/lib/route.ts` — the *same pure function* the client uses. Identical
    input, identical output, on both sides.
@@ -69,8 +71,9 @@ Design constraints that shaped everything below:
 5. **Metadata.** `generateMetadata()` produces the title, description and `hreflang` alternates
    (`fr`/`en` plus `x-default`) for the resolved route.
 6. **Shell render.** The page returns `<SiteShell initialRoute={route} initialContent={content} />`.
-   The server HTML therefore already contains the correct language, the correct page and the real
-   content — the client bundle is an enhancement, not a prerequisite.
+   The server HTML therefore already contains the correct document language, page and real content —
+   the client bundle is an enhancement, not a prerequisite. `/en/...` starts with `lang="en"`;
+   French, bare, unknown-language and `/admin` paths start with `lang="fr"`.
 
 `export const dynamic = 'force-dynamic'` on the page and on the public content route: content is
 edited from the dashboard and must appear immediately, so nothing is statically cached.
