@@ -29,7 +29,8 @@ jobs:
           - 5432:5432
 
     env:
-      DATABASE_URL: postgresql://mycofert:mycofert_dev@localhost:5432/mycofert?schema=public
+      DATABASE_URL: postgresql://mycofert:mycofert_dev@127.0.0.1:5432/mycofert?schema=public
+      DIRECT_URL: postgresql://mycofert:mycofert_dev@127.0.0.1:5432/mycofert?schema=public
       ADMIN_PASSCODE: ci-test-passcode-secure
       ADMIN_SESSION_SECRET: ci-test-session-secret-0123456789abcdef0123456789
 
